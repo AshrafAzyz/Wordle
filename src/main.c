@@ -1,11 +1,13 @@
 #include "dictionary.h"
 #include "game.h"
 #include "input.h"
+#include "ui.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
 
 int main(void)
 {
@@ -23,8 +25,6 @@ int main(void)
         printf("Failed to load dictionary.\n");
         return 1;
     }
-
-    printf("Dictionary loaded: %d words\n", word_count);
 
     /*
      * Seed the random number generator.
@@ -50,10 +50,17 @@ int main(void)
 
     game_init(&game, answer);
 
-    printf("\n");
-    printf("=== WORDLE ===\n");
-    printf("Guess the 5-letter word.\n");
-    printf("You have %d attempts.\n\n", MAX_GUESSES);
+    /*
+     * Initialize the input and UI systems.
+     */
+    input_init();
+    ui_init();
+
+    /*
+     * Display the game introduction.
+     */
+    ui_display_title();
+    ui_display_instructions();
 
     /*
      * Main game loop.
@@ -76,6 +83,7 @@ int main(void)
          * five letters.
          */
         if (strlen(guess) != WORD_LENGTH) {
+
             printf(
                 "Guess must contain exactly %d letters.\n\n",
                 WORD_LENGTH
@@ -94,7 +102,10 @@ int main(void)
                 guess
             )) {
 
-            printf("Word is not in the dictionary.\n\n");
+            printf(
+                "Word is not in the dictionary.\n\n"
+            );
+
             continue;
         }
 
@@ -102,49 +113,29 @@ int main(void)
          * Submit the guess to the game engine.
          */
         if (!game_submit_guess(&game, guess)) {
+
             printf("Could not submit guess.\n");
+
             continue;
         }
 
         /*
-         * Display the result.
+         * Display the result through the UI module.
          */
         GuessResult *result =
             &game.guesses[game.current_guess - 1];
 
-        for (int i = 0; i < WORD_LENGTH; i++) {
-
-            printf("%c", result->letters[i]);
-
-            if (result->results[i] == LETTER_CORRECT) {
-                printf("!");
-            }
-            else if (result->results[i] == LETTER_PRESENT) {
-                printf("?");
-            }
-            else {
-                printf("X");
-            }
-
-            printf(" ");
-        }
-
-        printf("\n\n");
+        ui_display_guess(result);
     }
 
     /*
      * Display the final result.
      */
     if (game.won) {
-        printf("🎉 You won!\n");
-        printf(
-            "You solved it in %d guesses.\n",
-            game.current_guess
-        );
+        ui_display_win(game.current_guess);
     }
     else {
-        printf("Game over!\n");
-        printf("The answer was: %s\n", answer);
+        ui_display_game_over(answer);
     }
 
     /*
