@@ -9,3 +9,5 @@ tests/test_input
 
 # Build directory
 build/
+
+/wordle
