@@ -11,3 +11,4 @@ tests/test_input
 build/
 
 /wordle
+tests/test_gfx
