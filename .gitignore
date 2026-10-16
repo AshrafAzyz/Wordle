@@ -1,0 +1,10 @@
+# Compiled executables
+tests/test_game
+tests/test_dictionary
+
+# General C build output
+*.o
+*.out
+
+# Build directory
+build/
