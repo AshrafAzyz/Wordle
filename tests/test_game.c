@@ -24,47 +24,60 @@ void print_result(const GuessResult *result)
 }
 
 
-void test_guess(
-    const char *answer,
-    const char *guess
-)
+int main(void)
 {
     Game game;
 
-    game_init(&game, answer);
+    game_init(&game, "CRANE");
 
-    int success =
-        game_submit_guess(&game, guess);
+    printf("=== Six Guess Test ===\n\n");
 
-    printf("Answer: %s\n", answer);
-    printf("Guess:  %s\n", guess);
+    const char *guesses[MAX_GUESSES] = {
+        "XXXXX",
+        "BBBBB",
+        "CCCCC",
+        "DDDDD",
+        "EEEEE",
+        "FFFFF"
+    };
 
-    if (!success) {
-        printf("Submission failed!\n\n");
-        return;
+    for (int i = 0; i < MAX_GUESSES; i++) {
+
+        printf(
+            "Guess %d: %s\n",
+            i + 1,
+            guesses[i]
+        );
+
+        int success =
+            game_submit_guess(&game, guesses[i]);
+
+        printf(
+            "Submitted: %s\n",
+            success ? "YES" : "NO"
+        );
+
+        print_result(
+            &game.guesses[i]
+        );
+
+        printf(
+            "Game over: %s\n\n",
+            game_is_over(&game)
+                ? "YES"
+                : "NO"
+        );
     }
 
-    print_result(&game.guesses[0]);
+    printf("=== Seventh Guess Test ===\n\n");
+
+    int success =
+        game_submit_guess(&game, "CRANE");
 
     printf(
-        "Won: %s\n\n",
-        game.won ? "YES" : "NO"
+        "Seventh guess accepted: %s\n",
+        success ? "YES" : "NO"
     );
-}
-
-
-int main(void)
-{
-    printf("=== Basic Tests ===\n\n");
-
-    test_guess("CRANE", "CRANE");
-    test_guess("CRANE", "XXXXX");
-    test_guess("CRANE", "CROWN");
-
-    printf("=== Duplicate Letter Tests ===\n\n");
-
-    test_guess("APPLE", "ALLEY");
-    test_guess("APPLE", "AAAAA");
 
     return 0;
 }

@@ -1,6 +1,7 @@
-# Compiled executables
+# Compiled test executables
 tests/test_game
 tests/test_dictionary
+tests/test_input
 
 # General C build output
 *.o
