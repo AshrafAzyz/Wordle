@@ -31,6 +31,7 @@ int main(void)
         case INPUT_BACKSPACE:  printf("BACKSPACE\n");                            break;
         case INPUT_ENTER:      printf("ENTER\n");                                break;
         case INPUT_FULLSCREEN: printf("FULLSCREEN\n");                           break;
+        case INPUT_TOGGLE_SOUND: printf("TOGGLE SOUND\n");                       break;
         case INPUT_CLICK:      printf("CLICK      x=%d y=%d\n", event.x, event.y); break;
         case INPUT_REDRAW:     printf("REDRAW\n");                               break;
         case INPUT_ESCAPE:     printf("ESCAPE - exiting\n");  running = 0;       break;

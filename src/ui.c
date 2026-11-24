@@ -233,8 +233,9 @@ static const Button GOODBYE_BUTTONS[] = {
     { UI_ACTION_QUIT, 310, 482, 300, 100, "EXIT" },
 };
 
-/* Raised button: offset shadow, then the face (original style). */
-static void draw_button(const Button *button, Color face)
+/* Raised button with any label: offset shadow, then the face. */
+static void draw_raised(const Button *button, Color face,
+                        const char *label, int text_pixel)
 {
     set_color(COLOR_SHADOW);
     fill_rect(button->x + 10, button->y + 15, button->w, button->h);
@@ -242,9 +243,15 @@ static void draw_button(const Button *button, Color face)
     set_color(face);
     fill_rect(button->x, button->y, button->w, button->h);
 
-    draw_text(button->label,
+    draw_text(label,
               button->x + button->w / 2, button->y + button->h / 2,
-              4, COLOR_BLACK);
+              text_pixel, COLOR_BLACK);
+}
+
+/* Raised button with its own label (original style). */
+static void draw_button(const Button *button, Color face)
+{
+    draw_raised(button, face, button->label, 4);
 }
 
 static void draw_buttons(const Button *buttons, int count, Color face)
@@ -306,13 +313,30 @@ static void draw_tile(int x, int y, int size, LetterResult result,
 
 /* ---- main menu ----------------------------------------------------- */
 
-static void draw_menu(void)
+/* Smaller button under the main three; its label shows the state. */
+static const Button SOUND_BUTTON = {
+    UI_ACTION_TOGGLE_SOUND, 330, 820, 260, 56, NULL
+};
+
+static const char *sound_label(UiSoundState sound)
+{
+    switch (sound) {
+    case UI_SOUND_ON:          return "SOUND: ON";
+    case UI_SOUND_OFF:         return "SOUND: OFF";
+    case UI_SOUND_UNAVAILABLE: break;
+    }
+
+    return "NO SOUND";
+}
+
+static void draw_menu(const UiView *view)
 {
     draw_background(COLOR_FRAME, COLOR_MENU_BG);
     draw_logo(120);
     draw_text("WELCOME TO OUR WORDLE GAME!!!", 460, 300, 3, COLOR_BLACK);
     draw_buttons(MENU_BUTTONS, COUNT(MENU_BUTTONS), COLOR_BUTTON_FACE);
-    draw_text("ENTER: NEW GAME   ESC: EXIT", 460, 880, 3, COLOR_SHADOW);
+    draw_raised(&SOUND_BUTTON, COLOR_BUTTON_LIGHT, sound_label(view->sound), 3);
+    draw_text("ENTER: NEW GAME   ESC: EXIT   F2: SOUND", 460, 960, 3, COLOR_SHADOW);
 }
 
 
@@ -357,8 +381,9 @@ static void draw_how_to_play(void)
         draw_text(EXAMPLES[i].caption, 460, top + 90, 3, COLOR_BLACK);
     }
 
-    draw_text("TYPE OR CLICK LETTERS. ENTER SUBMITS.", 460, 820, 3, COLOR_BLACK);
-    draw_text("BACKSPACE DELETES, ESC CLEARS, F11 FULLSCREEN.", 460, 860, 3, COLOR_BLACK);
+    draw_text("TYPE OR CLICK LETTERS. ENTER SUBMITS.", 460, 805, 3, COLOR_BLACK);
+    draw_text("BACKSPACE DELETES, ESC CLEARS.", 460, 840, 3, COLOR_BLACK);
+    draw_text("F11: FULLSCREEN   F2: SOUND ON/OFF", 460, 875, 3, COLOR_BLACK);
 
     draw_buttons(HOW_TO_PLAY_BUTTONS, COUNT(HOW_TO_PLAY_BUTTONS), COLOR_BUTTON_LIGHT);
 }
@@ -641,7 +666,7 @@ void ui_draw(const UiView *view)
     update_view();
 
     switch (view->screen) {
-    case SCREEN_MENU:        draw_menu();          break;
+    case SCREEN_MENU:        draw_menu(view);      break;
     case SCREEN_HOW_TO_PLAY: draw_how_to_play();   break;
     case SCREEN_PLAYING:     draw_playing(view);   break;
     case SCREEN_RESULT:      draw_result(view);    break;
@@ -661,6 +686,9 @@ UiAction ui_hit_test(Screen screen, int x, int y, char *letter)
 
     switch (screen) {
     case SCREEN_MENU:
+        if (hit_buttons(&SOUND_BUTTON, 1, dx, dy) != UI_ACTION_NONE) {
+            return UI_ACTION_TOGGLE_SOUND;
+        }
         return hit_buttons(MENU_BUTTONS, COUNT(MENU_BUTTONS), dx, dy);
     case SCREEN_HOW_TO_PLAY:
         return hit_buttons(HOW_TO_PLAY_BUTTONS, COUNT(HOW_TO_PLAY_BUTTONS), dx, dy);

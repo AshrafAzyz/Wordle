@@ -34,6 +34,10 @@ history of that work is in the Git log, one commit per milestone.
 - Main menu, How to Play, result screen with Play Again, and a goodbye
   screen.
 - Pixel-art look: block logo, scalable 5×7 pixel font, raised buttons.
+- 8-bit sound: looping chiptune music on the main menu, sounds for
+  clicks, typing and deleting, a buzz for invalid guesses, one note per
+  revealed tile (high = green, middle = yellow, low = grey), and win /
+  lose tunes. Toggle with **F2** or the SOUND button on the menu.
 - Works at any window size: the layout scales and stays centred;
   **F11** toggles fullscreen.
 - Installs into the application menu with its own icon (`make install`).
@@ -42,14 +46,19 @@ history of that work is in the Git log, one commit per milestone.
 
 - Linux with an X11 or Wayland desktop (Wayland runs it through
   XWayland, which Ubuntu includes)
-- GCC, GNU Make and the X11 development headers
+- GCC, GNU Make, and the X11 and ALSA development headers
 - Valgrind (optional, for the memory checks)
 
 On Ubuntu / Debian:
 
 ```sh
-sudo apt install build-essential libx11-dev valgrind
+sudo apt install build-essential libx11-dev libasound2-dev valgrind
 ```
+
+Sound plays through ALSA, which PipeWire or PulseAudio route to your
+speakers on a normal desktop. To build without sound (no ALSA headers
+needed), add `NO_SOUND=1` to any make command, e.g. `make NO_SOUND=1`.
+Run `make clean` when switching between the two.
 
 ## Build and run
 
@@ -61,7 +70,8 @@ make run      # builds (if needed) and starts the game
 ```
 
 The game finds its word list relative to the program itself, so
-`./build/wordle` works from any folder.
+`./build/wordle` works from any folder. If no audio device can be
+opened, it prints `Sound disabled: ...` and plays silently.
 
 ## Install (optional)
 
@@ -89,6 +99,7 @@ application menu instead.
 | Backspace or DEL | Delete the last letter |
 | Esc or CLEAR | Clear the row (on the menu: exit) |
 | F11 | Toggle fullscreen |
+| F2 | Sound on / off |
 
 ## Project structure
 
@@ -100,6 +111,8 @@ wordle/
 │   ├── dictionary.c   loading, validating and looking up words
 │   ├── ui.c           every screen, layout scaling, click hit-testing
 │   ├── font.c         5×7 pixel-art font
+│   ├── sound.c        synthesises all sound effects and the menu music
+│   ├── audio.c        plays sound through ALSA on a background thread
 │   ├── input.c        turns X11 events into game events
 │   └── gfx.c          thin X11 layer: window, double-buffered drawing, events
 ├── include/           one header per module (its public interface)
@@ -116,21 +129,25 @@ How the modules depend on each other:
 main ──► game ──► dictionary          (no X11: unit tested)
   ├────► dictionary
   ├────► input ──► gfx ──► Xlib
-  └────► ui ──► font ──► gfx
-           └──► game (read only)
+  ├────► ui ──► font ──► gfx
+  │        └──► game (read only)
+  └────► audio ──► sound              (sound: unit tested)
+           └──► ALSA + a mixing thread
 ```
 
-`game` and `dictionary` never touch X11, which is why they can be
-tested without a window. `ui` only draws and reports what was clicked;
+`game`, `dictionary` and `sound` never touch X11 or the sound card,
+which is why they can be tested without a window or speakers. `audio`
+mixes the music and up to 16 overlapping effects on its own thread;
+the shared data is protected by a mutex. `ui` only draws and reports what was clicked;
 `main` is the only module that changes game state.
 
 ## Testing
 
 ```sh
-make test            # 34 unit tests, no display needed
+make test            # 39 unit tests, no display or speakers needed
 make memcheck        # the same tests under Valgrind (fails on any leak/error)
 make debug           # build with AddressSanitizer + UndefinedBehaviorSanitizer
-make memcheck-game   # play the real game under Valgrind
+make memcheck-game   # play the real game under Valgrind (audio muted, see below)
 make manual-tests    # interactive X11 checks: build/test_gfx, build/test_input
 ```
 
@@ -142,7 +159,16 @@ win and loss, keyboard colours, and dictionary loading failures
 - a **differential test** comparing the scorer with an independent
   implementation on all 59,049 answer/guess pairs over three letters;
 - **1,000 random games** checking rules that must always hold;
-- a **100,000-word** generated dictionary.
+- a **100,000-word** generated dictionary;
+- sound tests: every effect renders, is audible but not clipped, fades
+  in and out (no clicks), and the tile notes have the right pitch
+  (measured by counting zero crossings); the music loops seamlessly.
+
+`make memcheck-game` sends audio to ALSA's null device
+(`tests/alsa-null.conf`), because PipeWire's ALSA plugin keeps about
+18 KB of its own memory after the device is closed. With the null
+device the game ends with 0 bytes in use. The audio thread was also
+checked for data races with GCC's ThreadSanitizer (`-fsanitize=thread`).
 
 All code is compiled with `-std=c11 -Wall -Wextra -Wpedantic -Wshadow`
 and builds without warnings.
@@ -157,7 +183,11 @@ and builds without warnings.
   Add more words (one per line) to extend it.
 - **Random, not daily.** Each game picks a random word; there is no
   daily puzzle, statistics or streaks.
-- No animations, sound or hard mode.
+- No animations or hard mode. Sound has an on/off switch but no volume
+  control (use the system volume).
+- With PipeWire, Valgrind reports about 18 KB "definitely lost" inside
+  PipeWire's ALSA plugin, allocated once when the sound device opens.
+  It is not in this project's code (see Testing) and does not grow.
 - English letters A–Z only. The on-screen keyboard is alphabetical
   (as in the original design), not QWERTY.
 - On very small windows (minimum 320×360) the text becomes tiny.
@@ -171,5 +201,10 @@ and builds without warnings.
   Patrick Sebastian, and further changed for this project (double
   buffering, event handling, clean shutdown). The original header does
   not state a licence; its credits are kept in the file.
+- **Sound effects and music** are original: they are synthesised at
+  run time from simple waveforms by `src/sound.c` (the melody and every
+  effect are written as tables in that file). No recorded audio,
+  sample packs or third-party sound files are used, so no extra
+  licence applies; they are covered by the MIT License below.
 - Everything else: © 2026 Ahmad Ashraf, released under the
   [MIT License](LICENSE).

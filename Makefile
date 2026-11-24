@@ -10,6 +10,8 @@
 #   make install       install for the current user (~/.local, no sudo)
 #   make uninstall     remove what `make install` added
 #   make clean         delete everything under build/
+#
+#   Add NO_SOUND=1 to any of these to build without sound (no ALSA needed).
 
 CC := gcc
 
@@ -28,18 +30,29 @@ CFLAGS   := $(CSTD) $(WARN) $(OPT)
 LDFLAGS  :=
 LDLIBS   := -lX11
 
+# Sound uses ALSA and POSIX threads (-pthread). `make NO_SOUND=1`
+# builds a silent game that needs neither: audio.c then compiles its
+# stub functions. Run `make clean` when switching between the two.
+ifeq ($(NO_SOUND),1)
+CPPFLAGS += -DWORDLE_NO_SOUND
+else
+CFLAGS   += -pthread
+LDLIBS   += -lasound -pthread
+endif
+
 BUILD_DIR := build
 TARGET    := $(BUILD_DIR)/wordle
 
-# Core modules have no X11 dependency, so they can be unit tested.
-CORE_SRC := src/game.c src/dictionary.c
+# Core modules have no X11 or audio-device dependency, so they can be
+# unit tested.
+CORE_SRC := src/game.c src/dictionary.c src/sound.c
 # Graphical front end.
-APP_SRC  := src/main.c src/ui.c src/font.c src/input.c src/gfx.c
+APP_SRC  := src/main.c src/ui.c src/font.c src/input.c src/gfx.c src/audio.c
 
 CORE_OBJ := $(CORE_SRC:src/%.c=$(BUILD_DIR)/%.o)
 APP_OBJ  := $(APP_SRC:src/%.c=$(BUILD_DIR)/%.o)
 
-TESTS        := $(BUILD_DIR)/test_game $(BUILD_DIR)/test_dictionary
+TESTS        := $(BUILD_DIR)/test_game $(BUILD_DIR)/test_dictionary $(BUILD_DIR)/test_sound
 MANUAL_TESTS := $(BUILD_DIR)/test_gfx $(BUILD_DIR)/test_input
 
 # Installation layout (XDG standard). `?=` sets PREFIX only if it was
@@ -82,6 +95,9 @@ $(BUILD_DIR)/test_game: $(BUILD_DIR)/test_game.o $(BUILD_DIR)/game.o $(BUILD_DIR
 $(BUILD_DIR)/test_dictionary: $(BUILD_DIR)/test_dictionary.o $(BUILD_DIR)/dictionary.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
+$(BUILD_DIR)/test_sound: $(BUILD_DIR)/test_sound.o $(BUILD_DIR)/sound.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+
 $(BUILD_DIR)/test_gfx: $(BUILD_DIR)/test_gfx.o $(BUILD_DIR)/gfx.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
@@ -116,9 +132,13 @@ memcheck: $(TESTS)
 # Play the real game under the same strict Valgrind settings. The game
 # frees everything (including X11 resources via XCloseDisplay), so
 # any report here is a real problem. Expect it to run slowly.
+# Audio goes to ALSA's null device (tests/alsa-null.conf): PipeWire's
+# ALSA plugin keeps ~18 KB of its own memory after closing, which
+# would hide real problems in our code. The game is silent here.
 memcheck-game: $(TARGET)
-	@echo "Play, then quit with EXIT or the window close button..."
-	@$(VALGRIND) ./$(TARGET) && echo "No memory errors or leaks."
+	@echo "Play (silently), then quit with EXIT or the window close button..."
+	@ALSA_CONFIG_PATH=tests/alsa-null.conf $(VALGRIND) ./$(TARGET) && \
+		echo "No memory errors or leaks."
 
 manual-tests: $(MANUAL_TESTS)
 
@@ -126,10 +146,11 @@ manual-tests: $(MANUAL_TESTS)
 
 # Rebuild everything into build/debug with no optimisation, full debug
 # info and runtime checks for memory errors and undefined behaviour.
+# The link commands include $(CFLAGS), so -fsanitize reaches the linker
+# through OPT; LDFLAGS is left alone for the user.
 debug:
 	$(MAKE) BUILD_DIR=$(BUILD_DIR)/debug \
 		OPT="-O0 -g3 -fno-omit-frame-pointer -fsanitize=address,undefined" \
-		LDFLAGS="-fsanitize=address,undefined" \
 		all $(TESTS:$(BUILD_DIR)/%=$(BUILD_DIR)/debug/%)
 
 # ---- installation ---------------------------------------------------

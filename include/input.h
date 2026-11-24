@@ -13,6 +13,7 @@ typedef enum {
     INPUT_ENTER,
     INPUT_ESCAPE,
     INPUT_FULLSCREEN,   /* F11 */
+    INPUT_TOGGLE_SOUND, /* F2  */
     INPUT_CLICK,        /* left mouse button at x, y                */
     INPUT_REDRAW,       /* window resized/uncovered: redraw screen  */
     INPUT_QUIT          /* window close button                      */

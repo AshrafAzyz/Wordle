@@ -20,6 +20,7 @@
 #include "input.h"
 #include "ui.h"
 #include "gfx.h"
+#include "audio.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,6 +78,7 @@ static void type_letter(App *app, char letter)
     if (app->typed_length < WORD_LENGTH) {
         app->typed[app->typed_length++] = letter;
         app->typed[app->typed_length] = '\0';
+        audio_play(SOUND_KEY);
     }
 }
 
@@ -84,6 +86,42 @@ static void delete_letter(App *app)
 {
     if (app->typed_length > 0) {
         app->typed[--app->typed_length] = '\0';
+        audio_play(SOUND_DELETE);
+    }
+}
+
+static void clear_row(App *app)
+{
+    if (app->typed_length > 0) {
+        clear_typed(app);
+        audio_play(SOUND_DELETE);
+    }
+}
+
+/* Time between the notes of the tile-by-tile reveal. */
+#define REVEAL_STEP_MS 110
+
+/* One note per tile (pitch by colour), then the win/lose tune. */
+static void play_guess_sounds(const App *app)
+{
+    const GuessResult *guess = &app->game.guesses[app->game.current_guess - 1];
+
+    for (int i = 0; i < WORD_LENGTH; i++) {
+        SoundEffect note = SOUND_TILE_ABSENT;
+
+        if (guess->results[i] == LETTER_CORRECT) note = SOUND_TILE_CORRECT;
+        if (guess->results[i] == LETTER_PRESENT) note = SOUND_TILE_PRESENT;
+
+        audio_play_after(note, i * REVEAL_STEP_MS);
+    }
+
+    int after_reveal = WORD_LENGTH * REVEAL_STEP_MS + 80;
+
+    if (app->game.won) {
+        audio_play_after(SOUND_WIN, after_reveal);
+    }
+    else if (game_is_over(&app->game)) {
+        audio_play_after(SOUND_LOSE, after_reveal);
     }
 }
 
@@ -91,11 +129,13 @@ static void submit_guess(App *app)
 {
     if (app->typed_length < WORD_LENGTH) {
         set_message(app, "NOT ENOUGH LETTERS", 1);
+        audio_play(SOUND_INVALID);
         return;
     }
 
     if (!dictionary_contains(app->words, app->word_count, app->typed)) {
         set_message(app, "NOT IN WORD LIST", 1);
+        audio_play(SOUND_INVALID);
         return;
     }
 
@@ -104,6 +144,7 @@ static void submit_guess(App *app)
     }
 
     clear_typed(app);
+    play_guess_sounds(app);
 
     /*
      * Stay on the board so the player can see the final colours;
@@ -130,6 +171,12 @@ static UiAction click_action(const App *app, const InputEvent *event, char *lett
     return ui_hit_test(app->screen, event->x, event->y, letter);
 }
 
+static void toggle_sound(void)
+{
+    audio_set_muted(!audio_is_muted());
+    audio_play(SOUND_CLICK);   /* heard only when sound was just turned on */
+}
+
 static void handle_menu(App *app, const InputEvent *event)
 {
     UiAction action = click_action(app, event, NULL);
@@ -138,10 +185,11 @@ static void handle_menu(App *app, const InputEvent *event)
     if (event->type == INPUT_ESCAPE) action = UI_ACTION_EXIT;
 
     switch (action) {
-    case UI_ACTION_NEW_GAME:    start_new_game(app);                break;
-    case UI_ACTION_HOW_TO_PLAY: app->screen = SCREEN_HOW_TO_PLAY;   break;
-    case UI_ACTION_EXIT:        app->screen = SCREEN_GOODBYE;       break;
-    default:                                                         break;
+    case UI_ACTION_NEW_GAME:     audio_play(SOUND_CLICK); start_new_game(app);              break;
+    case UI_ACTION_HOW_TO_PLAY:  audio_play(SOUND_CLICK); app->screen = SCREEN_HOW_TO_PLAY; break;
+    case UI_ACTION_EXIT:         audio_play(SOUND_CLICK); app->screen = SCREEN_GOODBYE;     break;
+    case UI_ACTION_TOGGLE_SOUND: toggle_sound();                                            break;
+    default:                                                                                 break;
     }
 }
 
@@ -152,6 +200,7 @@ static void handle_how_to_play(App *app, const InputEvent *event)
     if (action == UI_ACTION_BACK ||
         event->type == INPUT_ESCAPE ||
         event->type == INPUT_ENTER) {
+        audio_play(SOUND_CLICK);
         app->screen = SCREEN_MENU;
     }
 }
@@ -162,6 +211,7 @@ static void handle_playing(App *app, const InputEvent *event)
     UiAction action = click_action(app, event, &letter);
 
     if (action == UI_ACTION_MAIN_MENU) {
+        audio_play(SOUND_CLICK);
         app->screen = SCREEN_MENU;
         return;
     }
@@ -169,6 +219,7 @@ static void handle_playing(App *app, const InputEvent *event)
     /* Game finished: Enter or any click continues to the result. */
     if (game_is_over(&app->game)) {
         if (event->type == INPUT_ENTER || event->type == INPUT_CLICK) {
+            audio_play(SOUND_CLICK);
             set_message(app, NULL, 0);
             app->screen = SCREEN_RESULT;
         }
@@ -194,7 +245,7 @@ static void handle_playing(App *app, const InputEvent *event)
         break;
     case UI_ACTION_CLEAR:
         set_message(app, NULL, 0);
-        clear_typed(app);
+        clear_row(app);
         break;
     case UI_ACTION_ENTER:
         submit_guess(app);
@@ -212,9 +263,11 @@ static void handle_result(App *app, const InputEvent *event)
     if (event->type == INPUT_ESCAPE) action = UI_ACTION_MAIN_MENU;
 
     if (action == UI_ACTION_PLAY_AGAIN) {
+        audio_play(SOUND_CLICK);
         start_new_game(app);
     }
     else if (action == UI_ACTION_MAIN_MENU) {
+        audio_play(SOUND_CLICK);
         app->screen = SCREEN_MENU;
     }
 }
@@ -241,14 +294,28 @@ static void handle_event(App *app, const InputEvent *event)
     }
 }
 
+/* Menu music plays on the menu and How to Play screens only. */
+static void update_music(const App *app)
+{
+    audio_set_music(app->screen == SCREEN_MENU ||
+                    app->screen == SCREEN_HOW_TO_PLAY);
+}
+
 static void draw(const App *app)
 {
+    UiSoundState sound = UI_SOUND_UNAVAILABLE;
+
+    if (audio_is_available()) {
+        sound = audio_is_muted() ? UI_SOUND_OFF : UI_SOUND_ON;
+    }
+
     UiView view = {
         .screen = app->screen,
         .game = &app->game,
         .typed = app->typed,
         .message = app->message,
         .message_is_error = app->message_is_error,
+        .sound = sound,
     };
 
     ui_draw(&view);
@@ -345,6 +412,10 @@ int main(void)
         return 1;
     }
 
+    /* Sound is optional: if it fails, the game simply stays silent. */
+    audio_init();
+    update_music(&app);
+
     draw(&app);
 
     while (app.running) {
@@ -360,15 +431,21 @@ int main(void)
             continue;
         }
 
-        if (event.type != INPUT_REDRAW) {
+        if (event.type == INPUT_TOGGLE_SOUND) {
+            toggle_sound();
+        }
+        else if (event.type != INPUT_REDRAW) {
             handle_event(&app, &event);
         }
+
+        update_music(&app);
 
         if (app.running) {
             draw(&app);
         }
     }
 
+    audio_shutdown();
     ui_shutdown();
     dictionary_free(app.words, app.word_count);
 

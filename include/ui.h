@@ -29,8 +29,16 @@ typedef enum {
     UI_ACTION_LETTER,
     UI_ACTION_ENTER,
     UI_ACTION_DELETE,
-    UI_ACTION_CLEAR
+    UI_ACTION_CLEAR,
+    UI_ACTION_TOGGLE_SOUND
 } UiAction;
+
+/* What the menu's sound button shows. */
+typedef enum {
+    UI_SOUND_UNAVAILABLE,   /* no audio device */
+    UI_SOUND_ON,
+    UI_SOUND_OFF
+} UiSoundState;
 
 /* Everything needed to draw one frame. */
 typedef struct {
@@ -39,6 +47,7 @@ typedef struct {
     const char *typed;       /* letters typed in the current row     */
     const char *message;     /* status line under the board, or NULL */
     int message_is_error;
+    UiSoundState sound;      /* label of the menu's sound button     */
 } UiView;
 
 /* Open the window. Returns 1 on success, 0 if no display is available. */

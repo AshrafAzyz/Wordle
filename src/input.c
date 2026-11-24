@@ -34,6 +34,10 @@ InputEvent input_from_key(int keysym)
         event.type = INPUT_FULLSCREEN;
         return event;
 
+    case XK_F2:
+        event.type = INPUT_TOGGLE_SOUND;
+        return event;
+
     default:
         break;
     }
