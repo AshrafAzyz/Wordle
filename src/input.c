@@ -1,45 +1,109 @@
 #include "input.h"
+#include "gfx.h"
 
-#include <stdio.h>
-#include <string.h>
-#include <ctype.h>
+#include <X11/keysym.h>
 
 
 void input_init(void)
 {
     /*
-     * Input initialization will be added here
-     * when we connect the module to X11.
+     * Input is handled through the X11
+     * graphics event system.
      */
 }
 
 
-int input_get_guess(
-    char *buffer,
-    int buffer_size
-)
+InputEvent input_wait_event(void)
 {
-    if (buffer == NULL || buffer_size <= 0) {
-        return 0;
+    InputEvent event;
+
+    event.type = INPUT_NONE;
+    event.letter = '\0';
+
+    while (1) {
+
+        int key = gfx_wait_key();
+
+        /*
+         * F11
+         *
+         * Toggle fullscreen.
+         */
+        if (key == XK_F11) {
+
+            gfx_toggle_fullscreen();
+
+            event.type = INPUT_FULLSCREEN;
+
+            return event;
+        }
+
+
+        /*
+         * ENTER
+         *
+         * Normal keyboard Enter.
+         */
+        if (key == XK_Return ||
+            key == XK_KP_Enter) {
+
+            event.type = INPUT_ENTER;
+
+            return event;
+        }
+
+
+        /*
+         * BACKSPACE
+         *
+         * Handle both Backspace and
+         * Delete-style keyboard events.
+         */
+        if (key == XK_BackSpace ||
+            key == XK_Delete ||
+            key == XK_KP_Delete) {
+
+            event.type = INPUT_BACKSPACE;
+
+            return event;
+        }
+
+
+        /*
+         * ESCAPE
+         */
+        if (key == XK_Escape) {
+
+            event.type = INPUT_ESCAPE;
+
+            return event;
+        }
+
+
+        /*
+         * Convert lowercase letters
+         * into uppercase.
+         */
+        if (key >= XK_a &&
+            key <= XK_z) {
+
+            key =
+                key - XK_a + XK_A;
+        }
+
+
+        /*
+         * Accept A-Z.
+         */
+        if (key >= XK_A &&
+            key <= XK_Z) {
+
+            event.type = INPUT_LETTER;
+
+            event.letter =
+                (char)key;
+
+            return event;
+        }
     }
-
-    printf("Enter your guess: ");
-
-    if (fgets(buffer, buffer_size, stdin) == NULL) {
-        return 0;
-    }
-
-    /*
-     * Remove newline characters.
-     */
-    buffer[strcspn(buffer, "\r\n")] = '\0';
-
-    /*
-     * Convert all letters to uppercase.
-     */
-    for (int i = 0; buffer[i] != '\0'; i++) {
-        buffer[i] = (char)toupper((unsigned char)buffer[i]);
-    }
-
-    return 1;
 }

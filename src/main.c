@@ -2,6 +2,7 @@
 #include "game.h"
 #include "input.h"
 #include "ui.h"
+#include "gfx.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,7 +28,7 @@ int main(void)
     }
 
     /*
-     * Seed the random number generator.
+     * Seed random number generation.
      */
     srand((unsigned int)time(NULL));
 
@@ -35,11 +36,19 @@ int main(void)
      * Select the answer.
      */
     const char *answer =
-        dictionary_pick_random(words, word_count);
+        dictionary_pick_random(
+            words,
+            word_count
+        );
 
     if (answer == NULL) {
         printf("Failed to select a word.\n");
-        dictionary_free(words, word_count);
+
+        dictionary_free(
+            words,
+            word_count
+        );
+
         return 1;
     }
 
@@ -48,100 +57,201 @@ int main(void)
      */
     Game game;
 
-    game_init(&game, answer);
+    game_init(
+        &game,
+        answer
+    );
 
     /*
-     * Initialize the input and UI systems.
+     * Initialize systems.
      */
     input_init();
     ui_init();
 
     /*
-     * Display the game introduction.
+     * Current unsubmitted guess.
      */
-    ui_display_title();
-    ui_display_instructions();
+    char current_guess[WORD_LENGTH + 1];
+
+    memset(
+        current_guess,
+        0,
+        sizeof(current_guess)
+    );
+
+    int current_length = 0;
+
+    /*
+     * Draw initial game state.
+     */
+    ui_draw_game(&game);
 
     /*
      * Main game loop.
      */
     while (!game_is_over(&game)) {
 
-        char guess[INPUT_BUFFER_SIZE];
+        InputEvent event =
+            input_wait_event();
 
-        if (!input_get_guess(
-                guess,
-                sizeof(guess)
-            )) {
+        /*
+         * User typed a letter.
+         */
+        if (event.type == INPUT_LETTER) {
 
-            printf("Failed to read input.\n");
-            break;
+            if (current_length < WORD_LENGTH) {
+
+                current_guess[current_length] =
+                    event.letter;
+
+                current_length++;
+
+                current_guess[current_length] =
+                    '\0';
+            }
         }
 
         /*
-         * Check that the guess has exactly
-         * five letters.
+         * User pressed backspace.
          */
-        if (strlen(guess) != WORD_LENGTH) {
+        else if (event.type == INPUT_BACKSPACE) {
 
-            printf(
-                "Guess must contain exactly %d letters.\n\n",
-                WORD_LENGTH
+            if (current_length > 0) {
+
+                current_length--;
+
+                current_guess[current_length] =
+                    '\0';
+            }
+        }
+
+        /*
+         * User pressed ESC.
+         */
+        else if (event.type == INPUT_ESCAPE) {
+
+            current_length = 0;
+
+            current_guess[0] = '\0';
+        }
+
+        /*
+         * User pressed F11.
+         *
+         * The window size changed, so
+         * redraw the entire interface.
+         */
+        else if (event.type == INPUT_FULLSCREEN) {
+
+            /*
+             * The window has now finished resizing.
+             *
+             * Clear the new window dimensions.
+             */
+            gfx_clear();
+
+            /*
+             * Redraw the complete interface.
+             */
+            ui_display_title();
+
+            ui_display_instructions();
+
+            ui_draw_game(&game);
+
+            ui_draw_current_guess(
+                &game,
+                current_guess
             );
 
             continue;
         }
 
         /*
-         * Check whether the word exists
-         * in our dictionary.
+         * User pressed ENTER.
          */
-        if (!dictionary_contains(
-                words,
-                word_count,
-                guess
-            )) {
+        else if (event.type == INPUT_ENTER) {
 
-            printf(
-                "Word is not in the dictionary.\n\n"
-            );
+            /*
+             * Only submit complete guesses.
+             */
+            if (current_length != WORD_LENGTH) {
 
-            continue;
+                continue;
+            }
+
+            /*
+             * Check dictionary.
+             */
+            if (!dictionary_contains(
+                    words,
+                    word_count,
+                    current_guess
+                )) {
+
+                /*
+                 * For now, simply ignore
+                 * invalid dictionary words.
+                 */
+                continue;
+            }
+
+            /*
+             * Submit guess.
+             */
+            if (!game_submit_guess(
+                    &game,
+                    current_guess
+                )) {
+
+                continue;
+            }
+
+            /*
+             * Clear current input.
+             */
+            current_length = 0;
+
+            current_guess[0] = '\0';
         }
 
         /*
-         * Submit the guess to the game engine.
+         * Redraw the board after every event.
          */
-        if (!game_submit_guess(&game, guess)) {
-
-            printf("Could not submit guess.\n");
-
-            continue;
-        }
+        ui_draw_game(&game);
 
         /*
-         * Display the result through the UI module.
+         * Draw the letters currently being typed.
          */
-        GuessResult *result =
-            &game.guesses[game.current_guess - 1];
-
-        ui_display_guess(result);
+        ui_draw_current_guess(
+            &game,
+            current_guess
+        );
     }
 
     /*
-     * Display the final result.
+     * Display final result.
      */
     if (game.won) {
-        ui_display_win(game.current_guess);
+
+        ui_display_win(
+            game.current_guess
+        );
     }
     else {
-        ui_display_game_over(answer);
+
+        ui_display_game_over(
+            answer
+        );
     }
 
     /*
      * Free dictionary memory.
      */
-    dictionary_free(words, word_count);
+    dictionary_free(
+        words,
+        word_count
+    );
 
     return 0;
 }

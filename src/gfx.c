@@ -16,6 +16,7 @@ Version 4a, January 16, 2017 - added functionality to fill rectangles and circle
 #include <stdlib.h>
 #include <string.h>
 #include "gfx.h"
+#include <X11/keysym.h>
 
 /*
 gfx_open creates several X11 objects, and stores them in globals
@@ -32,6 +33,7 @@ static int      gfx_fast_color_mode = 0;
 
 static int saved_xpos = 0;
 static int saved_ypos = 0;
+static int gfx_fullscreen = 0;
 
 /* Open a new graphics window. */
 
@@ -82,6 +84,83 @@ void gfx_open( int width, int height, const char *title )
 	}
 }
 
+void gfx_toggle_fullscreen(void)
+{
+    Atom wm_state;
+    Atom fullscreen;
+    XEvent event;
+
+    wm_state = XInternAtom(
+        gfx_display,
+        "_NET_WM_STATE",
+        False
+    );
+
+    fullscreen = XInternAtom(
+        gfx_display,
+        "_NET_WM_STATE_FULLSCREEN",
+        False
+    );
+
+    memset(
+        &event,
+        0,
+        sizeof(event)
+    );
+
+    event.type = ClientMessage;
+
+    event.xclient.window =
+        gfx_window;
+
+    event.xclient.message_type =
+        wm_state;
+
+    event.xclient.format = 32;
+
+    /*
+     * 2 = toggle
+     */
+    event.xclient.data.l[0] = 2;
+
+    event.xclient.data.l[1] =
+        fullscreen;
+
+    event.xclient.data.l[2] = 0;
+
+    XSendEvent(
+        gfx_display,
+        DefaultRootWindow(gfx_display),
+        False,
+        SubstructureNotifyMask |
+        SubstructureRedirectMask,
+        &event
+    );
+
+    XFlush(gfx_display);
+
+    /*
+     * Wait until the window manager
+     * actually resizes our window.
+     */
+    while (1) {
+
+        XNextEvent(
+            gfx_display,
+            &event
+        );
+
+        if (event.type == ConfigureNotify &&
+            event.xconfigure.window == gfx_window) {
+
+            break;
+        }
+    }
+
+    gfx_fullscreen =
+        !gfx_fullscreen;
+}
+
 /* Draw a single point at (x,y) */
 
 void gfx_point( int x, int y )
@@ -128,9 +207,19 @@ void gfx_fillcircle( int x, int y, int radius )
 	XDrawText(gfx_display,gfx_window,gfx_gc,x,y,test1,6);
 }
 */
-void gfx_text(char *test2, int x, int y)
+
+
+void gfx_text(const char *text, int x, int y)
 {
-	XDrawString(gfx_display,gfx_window,gfx_gc,x,y,test2,strlen(test2));
+    XDrawString(
+        gfx_display,
+        gfx_window,
+        gfx_gc,
+        x,
+        y,
+        text,
+        strlen(text)
+    );
 }
 
 /* Change the current drawing color. */
@@ -200,6 +289,31 @@ int gfx_event_waiting()
        }
 }
 
+int gfx_wait_key(void)
+{
+    XEvent event;
+
+    gfx_flush();
+
+    while (1) {
+
+        XNextEvent(
+            gfx_display,
+            &event
+        );
+
+        if (event.type == KeyPress) {
+
+            saved_xpos = event.xkey.x;
+            saved_ypos = event.xkey.y;
+
+            return XLookupKeysym(
+                &event.xkey,
+                0
+            );
+        }
+    }
+}
 /* Wait for the user to press a key or mouse button. */
 
 char gfx_wait()
@@ -222,6 +336,34 @@ char gfx_wait()
 		}
 	}
 }
+
+int gfx_xsize(void)
+{
+    XWindowAttributes attributes;
+
+    XGetWindowAttributes(
+        gfx_display,
+        gfx_window,
+        &attributes
+    );
+
+    return attributes.width;
+}
+
+
+int gfx_ysize(void)
+{
+    XWindowAttributes attributes;
+
+    XGetWindowAttributes(
+        gfx_display,
+        gfx_window,
+        &attributes
+    );
+
+    return attributes.height;
+}
+
 
 /* Return the X and Y coordinates of the last event. */
 

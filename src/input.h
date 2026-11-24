@@ -1,13 +1,26 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-#define INPUT_BUFFER_SIZE 32
+
+typedef enum {
+    INPUT_NONE,
+    INPUT_LETTER,
+    INPUT_BACKSPACE,
+    INPUT_ENTER,
+    INPUT_ESCAPE,
+    INPUT_FULLSCREEN
+} InputType;
+
+
+typedef struct {
+    InputType type;
+    char letter;
+} InputEvent;
+
 
 void input_init(void);
 
-int input_get_guess(
-    char *buffer,
-    int buffer_size
-);
+InputEvent input_wait_event(void);
+
 
 #endif
