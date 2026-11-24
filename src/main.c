@@ -266,7 +266,13 @@ int main(void)
     clear_typed(&app);
 
     input_init();
-    ui_init();
+
+    if (!ui_init()) {
+        /* gfx_open() already explained why; clean up before leaving. */
+        dictionary_free(app.words, app.word_count);
+        return 1;
+    }
+
     draw(&app);
 
     while (app.running) {

@@ -573,9 +573,9 @@ static void draw_goodbye(void)
 
 /* ---- public API ---------------------------------------------------- */
 
-void ui_init(void)
+int ui_init(void)
 {
-    gfx_open(WINDOW_WIDTH, WINDOW_HEIGHT, "Wordle");
+    return gfx_open(WINDOW_WIDTH, WINDOW_HEIGHT, "Wordle");
 }
 
 void ui_shutdown(void)

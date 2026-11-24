@@ -7,6 +7,7 @@
 #include "game.h"
 #include "test_framework.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 
@@ -304,6 +305,146 @@ static void test_keyboard_keeps_best_state(void)
 }
 
 
+/* ---- stress tests -------------------------------------------------- */
+
+/*
+ * An independent scorer using a different algorithm (letter counts
+ * instead of "used" flags). If two different methods agree on every
+ * input, a shared mistake is very unlikely.
+ */
+static void reference_score(const char *answer, const char *guess,
+                            LetterResult out[WORD_LENGTH])
+{
+    int unmatched[ALPHABET_SIZE] = {0};
+
+    for (int i = 0; i < WORD_LENGTH; i++) {
+        if (guess[i] == answer[i]) {
+            out[i] = LETTER_CORRECT;
+        }
+        else {
+            out[i] = LETTER_ABSENT;
+            unmatched[answer[i] - 'A']++;
+        }
+    }
+
+    for (int i = 0; i < WORD_LENGTH; i++) {
+        if (out[i] != LETTER_CORRECT && unmatched[guess[i] - 'A'] > 0) {
+            out[i] = LETTER_PRESENT;
+            unmatched[guess[i] - 'A']--;
+        }
+    }
+}
+
+/* Write the n-th word over a small alphabet (base-k counting). */
+static void nth_word(int n, const char *alphabet, int k, char word[WORD_LENGTH + 1])
+{
+    for (int i = WORD_LENGTH - 1; i >= 0; i--) {
+        word[i] = alphabet[n % k];
+        n /= k;
+    }
+    word[WORD_LENGTH] = '\0';
+}
+
+/* [R4] every answer/guess pair over {A,B,C}: 243 x 243 = 59,049 */
+static void test_evaluate_matches_reference_exhaustively(void)
+{
+    const int words = 3 * 3 * 3 * 3 * 3;
+    int mismatches = 0;
+
+    for (int a = 0; a < words; a++) {
+        char answer[WORD_LENGTH + 1];
+        nth_word(a, "ABC", 3, answer);
+
+        for (int g = 0; g < words; g++) {
+            char guess[WORD_LENGTH + 1];
+            LetterResult expected[WORD_LENGTH];
+            LetterResult actual[WORD_LENGTH];
+
+            nth_word(g, "ABC", 3, guess);
+            reference_score(answer, guess, expected);
+            game_evaluate(answer, guess, actual);
+
+            if (memcmp(expected, actual, sizeof(actual)) != 0) {
+                if (mismatches < 5) {   /* show the first few only */
+                    printf("    answer %s guess %s: expected %s",
+                           answer, guess, pattern(expected));
+                    printf(", got %s\n", pattern(actual));
+                }
+                mismatches++;
+            }
+        }
+    }
+
+    CHECK(mismatches == 0);
+}
+
+/* [R9][R10][R11] 1,000 random games; rules that must always hold. */
+static void test_random_games_keep_invariants(void)
+{
+    const char *alphabet = "ABCDEF";   /* small: lots of repeated letters */
+    int violations = 0;
+
+    srand(2024);   /* fixed seed: the same games every run */
+
+    for (int n = 0; n < 1000; n++) {
+        Game game;
+        char answer[WORD_LENGTH + 1];
+
+        nth_word(rand() % 7776, alphabet, 6, answer);   /* 6^5 words */
+        game_init(&game, answer);
+
+        int turns = 0;
+
+        while (!game_is_over(&game)) {
+            char guess[WORD_LENGTH + 1];
+
+            /* Usually a random word; sometimes the answer itself. */
+            if (rand() % 8 == 0) {
+                strcpy(guess, answer);
+            }
+            else {
+                nth_word(rand() % 7776, alphabet, 6, guess);
+            }
+
+            if (game_submit_guess(&game, guess) != GUESS_ACCEPTED) {
+                violations++;
+                break;
+            }
+
+            turns++;
+
+            const LetterResult *r = game.guesses[game.current_guess - 1].results;
+            int all_green = 1;
+            for (int i = 0; i < WORD_LENGTH; i++) {
+                if (r[i] != LETTER_CORRECT) {
+                    all_green = 0;
+                }
+            }
+
+            if (game.current_guess != turns || turns > MAX_GUESSES) violations++;
+            if (game.won != all_green)                               violations++;
+            if (game_is_over(&game) && !game.won && turns != MAX_GUESSES) violations++;
+
+            /* A guessed letter that is in the answer is never grey. */
+            for (int i = 0; i < WORD_LENGTH; i++) {
+                int in_answer = strchr(answer, guess[i]) != NULL;
+                LetterResult key = game_keyboard_state(&game, guess[i]);
+
+                if (in_answer && key < LETTER_PRESENT)  violations++;
+                if (!in_answer && key != LETTER_ABSENT) violations++;
+            }
+        }
+
+        /* Nothing is accepted after the end. */
+        if (game_submit_guess(&game, answer) != GUESS_GAME_OVER) {
+            violations++;
+        }
+    }
+
+    CHECK(violations == 0);
+}
+
+
 int main(void)
 {
     printf("=== game engine tests ===\n");
@@ -325,6 +466,8 @@ int main(void)
     RUN_TEST(test_win_on_last_guess_is_a_win);
     RUN_TEST(test_six_wrong_guesses_is_a_loss);
     RUN_TEST(test_keyboard_keeps_best_state);
+    RUN_TEST(test_evaluate_matches_reference_exhaustively);
+    RUN_TEST(test_random_games_keep_invariants);
 
     return TEST_SUMMARY();
 }

@@ -16,10 +16,13 @@
 
 /*
  * Open the window. If the requested size does not fit on the
- * screen it is shrunk, keeping its aspect ratio. Exits the program
- * with an error message if no X display is available.
+ * screen it is shrunk, keeping its aspect ratio.
+ *
+ * Returns 1 on success. Returns 0 (after printing a message to
+ * stderr) if no X display is available; the caller decides how to
+ * clean up and exit.
  */
-void gfx_open(int width, int height, const char *title);
+int gfx_open(int width, int height, const char *title);
 
 /* Release every X11 resource and close the window. */
 void gfx_close(void);

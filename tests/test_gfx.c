@@ -24,7 +24,10 @@ static void draw(void)
 
 int main(void)
 {
-    gfx_open(800, 600, "Wordle Graphics Test");
+    if (!gfx_open(800, 600, "Wordle Graphics Test")) {
+        return 1;
+    }
+
     draw();
 
     for (;;) {

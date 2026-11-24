@@ -41,8 +41,8 @@ typedef struct {
     int message_is_error;
 } UiView;
 
-/* Open the window. */
-void ui_init(void);
+/* Open the window. Returns 1 on success, 0 if no display is available. */
+int ui_init(void);
 
 /* Close the window and free graphics resources. */
 void ui_shutdown(void);

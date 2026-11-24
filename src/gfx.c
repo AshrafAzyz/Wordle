@@ -114,7 +114,7 @@ static void drain_redraw_events(void)
 
 /* ---- window -------------------------------------------------------- */
 
-void gfx_open(int width, int height, const char *title)
+int gfx_open(int width, int height, const char *title)
 {
     display = XOpenDisplay(NULL);
 
@@ -123,7 +123,7 @@ void gfx_open(int width, int height, const char *title)
                 "gfx_open: unable to open the X display. "
                 "Is a graphical session running (DISPLAY=%s)?\n",
                 getenv("DISPLAY") ? getenv("DISPLAY") : "(unset)");
-        exit(1);
+        return 0;
     }
 
     int screen = DefaultScreen(display);
@@ -201,6 +201,8 @@ void gfx_open(int width, int height, const char *title)
     }
 
     ensure_buffer();
+
+    return 1;
 }
 
 void gfx_close(void)

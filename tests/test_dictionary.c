@@ -7,11 +7,19 @@
  * [Rn] marks which numbered requirement from the project brief a
  * test covers.
  */
+
+/*
+ * Ask for POSIX functions (mkstemp, fdopen, unlink) on top of
+ * standard C11. Must come before any #include to take effect.
+ */
+#define _POSIX_C_SOURCE 200809L
+
 #include "dictionary.h"
 #include "test_framework.h"
 
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define REAL_DICTIONARY "data/words.txt"
 #define FIXTURE(name)   ("tests/data/" name)
@@ -196,6 +204,75 @@ static void test_load_null_arguments_fail(void)
 }
 
 
+/* ---- stress -------------------------------------------------------- */
+
+#define BIG_WORD_COUNT 100000
+
+/* Turn n into a unique 5-letter word: base-26 counting, AAAAA = 0. */
+static void number_to_word(int n, char word[WORD_LENGTH + 1])
+{
+    for (int i = WORD_LENGTH - 1; i >= 0; i--) {
+        word[i] = (char)('A' + n % 26);
+        n /= 26;
+    }
+    word[WORD_LENGTH] = '\0';
+}
+
+/* 100,000 words plus junk lines: exercises many realloc() calls. */
+static void test_load_large_dictionary(void)
+{
+    char path[] = "/tmp/wordle_test_XXXXXX";
+
+    /* mkstemp replaces XXXXXX with a unique name and opens the file. */
+    int fd = mkstemp(path);
+    CHECK(fd != -1);
+    if (fd == -1) {
+        return;
+    }
+
+    FILE *file = fdopen(fd, "w");
+    CHECK(file != NULL);
+    if (file == NULL) {
+        close(fd);
+        unlink(path);
+        return;
+    }
+
+    for (int i = 0; i < BIG_WORD_COUNT; i++) {
+        char word[WORD_LENGTH + 1];
+        number_to_word(i, word);
+        fprintf(file, "%s\n", word);
+
+        if (i % 1000 == 0) {
+            fprintf(file, "not-a-word\n\n");   /* must be skipped */
+        }
+    }
+
+    fclose(file);
+
+    int count = 0;
+    char **words = dictionary_load(path, &count);
+
+    /* Delete the temporary file before checking, so it never lingers. */
+    unlink(path);
+
+    CHECK(words != NULL);
+    CHECK(count == BIG_WORD_COUNT);
+
+    if (words != NULL && count == BIG_WORD_COUNT) {
+        char last[WORD_LENGTH + 1];
+        number_to_word(BIG_WORD_COUNT - 1, last);
+
+        CHECK_STR_EQ(words[0], "AAAAA");
+        CHECK_STR_EQ(words[count - 1], last);
+        CHECK(dictionary_contains(words, count, last));
+        CHECK(!dictionary_contains(words, count, "ZZZZZ"));
+    }
+
+    dictionary_free(words, count);
+}
+
+
 /* ---- random choice and cleanup ------------------------------------- */
 
 static void test_pick_random_returns_a_listed_word(void)
@@ -242,6 +319,7 @@ int main(void)
     RUN_TEST(test_load_null_arguments_fail);
     RUN_TEST(test_pick_random_returns_a_listed_word);
     RUN_TEST(test_free_null_is_safe);
+    RUN_TEST(test_load_large_dictionary);
 
     return TEST_SUMMARY();
 }

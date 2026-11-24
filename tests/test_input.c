@@ -15,7 +15,10 @@
 
 int main(void)
 {
-    gfx_open(400, 200, "Input Test - press ESC to quit");
+    if (!gfx_open(400, 200, "Input Test - press ESC to quit")) {
+        return 1;
+    }
+
     input_init();
 
     printf("Type letters, Backspace, Enter, F11 or click. ESC quits.\n");

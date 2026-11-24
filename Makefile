@@ -4,6 +4,7 @@
 #   make run           build and start the game
 #   make test          build and run automated tests (no display needed)
 #   make memcheck      run the automated tests under Valgrind
+#   make memcheck-game play the game under Valgrind (strict, interactive)
 #   make manual-tests  build interactive X11 tests (test_gfx, test_input)
 #   make debug         build with AddressSanitizer/UBSan -> build/debug/
 #   make clean         delete everything under build/
@@ -39,7 +40,7 @@ APP_OBJ  := $(APP_SRC:src/%.c=$(BUILD_DIR)/%.o)
 TESTS        := $(BUILD_DIR)/test_game $(BUILD_DIR)/test_dictionary
 MANUAL_TESTS := $(BUILD_DIR)/test_gfx $(BUILD_DIR)/test_input
 
-.PHONY: all run test memcheck manual-tests debug clean
+.PHONY: all run test memcheck memcheck-game manual-tests debug clean
 
 all: $(TARGET)
 
@@ -101,6 +102,13 @@ memcheck: $(TESTS)
 		$(VALGRIND) ./$$t > /dev/null || { echo "MEMCHECK FAILED: $$t"; exit 1; }; \
 	done
 	@echo "No memory errors or leaks."
+
+# Play the real game under the same strict Valgrind settings. The game
+# frees everything (including X11 resources via XCloseDisplay), so
+# any report here is a real problem. Expect it to run slowly.
+memcheck-game: $(TARGET)
+	@echo "Play, then quit with EXIT or the window close button..."
+	@$(VALGRIND) ./$(TARGET) && echo "No memory errors or leaks."
 
 manual-tests: $(MANUAL_TESTS)
 
