@@ -31,7 +31,7 @@ TARGET    := $(BUILD_DIR)/wordle
 # Core modules have no X11 dependency, so they can be unit tested.
 CORE_SRC := src/game.c src/dictionary.c
 # Graphical front end.
-APP_SRC  := src/main.c src/ui.c src/input.c src/gfx.c
+APP_SRC  := src/main.c src/ui.c src/font.c src/input.c src/gfx.c
 
 CORE_OBJ := $(CORE_SRC:src/%.c=$(BUILD_DIR)/%.o)
 APP_OBJ  := $(APP_SRC:src/%.c=$(BUILD_DIR)/%.o)

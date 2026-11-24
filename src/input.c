@@ -6,104 +6,85 @@
 
 void input_init(void)
 {
-    /*
-     * Input is handled through the X11
-     * graphics event system.
-     */
+    /* Nothing to set up: events come from the gfx window. */
+}
+
+
+InputEvent input_from_key(int keysym)
+{
+    InputEvent event = { INPUT_NONE, '\0', 0, 0 };
+
+    switch (keysym) {
+    case XK_Return:
+    case XK_KP_Enter:
+        event.type = INPUT_ENTER;
+        return event;
+
+    case XK_BackSpace:
+    case XK_Delete:
+    case XK_KP_Delete:
+        event.type = INPUT_BACKSPACE;
+        return event;
+
+    case XK_Escape:
+        event.type = INPUT_ESCAPE;
+        return event;
+
+    case XK_F11:
+        event.type = INPUT_FULLSCREEN;
+        return event;
+
+    default:
+        break;
+    }
+
+    /* X11 KeySyms for letters match ASCII: XK_a == 'a', XK_A == 'A'. */
+    if (keysym >= XK_a && keysym <= XK_z) {
+        keysym = keysym - XK_a + XK_A;
+    }
+
+    if (keysym >= XK_A && keysym <= XK_Z) {
+        event.type = INPUT_LETTER;
+        event.letter = (char)keysym;
+    }
+
+    return event;
 }
 
 
 InputEvent input_wait_event(void)
 {
-    InputEvent event;
+    InputEvent event = { INPUT_NONE, '\0', 0, 0 };
 
-    event.type = INPUT_NONE;
-    event.letter = '\0';
+    for (;;) {
+        GfxEvent raw;
+        gfx_next_event(&raw);
 
-    while (1) {
-
-        int key = gfx_wait_key();
-
-        /*
-         * F11
-         *
-         * Toggle fullscreen.
-         */
-        if (key == XK_F11) {
-
-            gfx_toggle_fullscreen();
-
-            event.type = INPUT_FULLSCREEN;
-
+        switch (raw.type) {
+        case GFX_EVENT_CLOSE:
+            event.type = INPUT_QUIT;
             return event;
-        }
 
-
-        /*
-         * ENTER
-         *
-         * Normal keyboard Enter.
-         */
-        if (key == XK_Return ||
-            key == XK_KP_Enter) {
-
-            event.type = INPUT_ENTER;
-
+        case GFX_EVENT_REDRAW:
+            event.type = INPUT_REDRAW;
             return event;
-        }
 
+        case GFX_EVENT_CLICK:
+            /* Only the left button; ignore right/middle/scroll wheel. */
+            if (raw.button == 1) {
+                event.type = INPUT_CLICK;
+                event.x = raw.x;
+                event.y = raw.y;
+                return event;
+            }
+            break;
 
-        /*
-         * BACKSPACE
-         *
-         * Handle both Backspace and
-         * Delete-style keyboard events.
-         */
-        if (key == XK_BackSpace ||
-            key == XK_Delete ||
-            key == XK_KP_Delete) {
-
-            event.type = INPUT_BACKSPACE;
-
-            return event;
-        }
-
-
-        /*
-         * ESCAPE
-         */
-        if (key == XK_Escape) {
-
-            event.type = INPUT_ESCAPE;
-
-            return event;
-        }
-
-
-        /*
-         * Convert lowercase letters
-         * into uppercase.
-         */
-        if (key >= XK_a &&
-            key <= XK_z) {
-
-            key =
-                key - XK_a + XK_A;
-        }
-
-
-        /*
-         * Accept A-Z.
-         */
-        if (key >= XK_A &&
-            key <= XK_Z) {
-
-            event.type = INPUT_LETTER;
-
-            event.letter =
-                (char)key;
-
-            return event;
+        case GFX_EVENT_KEY:
+            event = input_from_key(raw.key);
+            if (event.type != INPUT_NONE) {
+                return event;
+            }
+            break;
         }
     }
 }

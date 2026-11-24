@@ -3,29 +3,57 @@
 
 #include "game.h"
 
+/*
+ * User interface: draws every screen and maps mouse clicks to
+ * actions. It never changes game state; main.c does that.
+ */
+
+typedef enum {
+    SCREEN_MENU,
+    SCREEN_HOW_TO_PLAY,
+    SCREEN_PLAYING,
+    SCREEN_RESULT,
+    SCREEN_GOODBYE
+} Screen;
+
+/* What a click on the current screen means. */
+typedef enum {
+    UI_ACTION_NONE,
+    UI_ACTION_NEW_GAME,
+    UI_ACTION_HOW_TO_PLAY,
+    UI_ACTION_EXIT,         /* menu "EXIT": go to the goodbye screen */
+    UI_ACTION_BACK,
+    UI_ACTION_PLAY_AGAIN,
+    UI_ACTION_MAIN_MENU,
+    UI_ACTION_QUIT,         /* goodbye "EXIT": close the program     */
+    UI_ACTION_LETTER,
+    UI_ACTION_ENTER,
+    UI_ACTION_DELETE,
+    UI_ACTION_CLEAR
+} UiAction;
+
+/* Everything needed to draw one frame. */
+typedef struct {
+    Screen screen;
+    const Game *game;        /* SCREEN_PLAYING and SCREEN_RESULT     */
+    const char *typed;       /* letters typed in the current row     */
+    const char *message;     /* status line under the board, or NULL */
+    int message_is_error;
+} UiView;
+
+/* Open the window. */
 void ui_init(void);
 
-void ui_draw_game(
-    const Game *game
-);
-
-void ui_display_title(void);
-
-void ui_display_instructions(void);
-
-void ui_display_win(
-    int guesses
-);
-
-void ui_display_game_over(
-    const char *answer
-);
-
-void ui_draw_current_guess(
-    const Game *game,
-    const char *guess
-);
-
+/* Close the window and free graphics resources. */
 void ui_shutdown(void);
+
+/* Draw the whole screen described by `view`. */
+void ui_draw(const UiView *view);
+
+/*
+ * Which action is at window position (x, y) on `screen`?
+ * For UI_ACTION_LETTER, the letter is stored in *letter.
+ */
+UiAction ui_hit_test(Screen screen, int x, int y, char *letter);
 
 #endif
