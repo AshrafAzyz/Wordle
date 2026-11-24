@@ -142,7 +142,7 @@ static void draw_empty_board(void)
             draw_tile(
                 x,
                 y,
-                LETTER_ABSENT
+                LETTER_EMPTY
             );
         }
     }
@@ -158,7 +158,7 @@ static void draw_tile(
     /*
      * Empty tiles use only an outline.
      */
-    if (result == LETTER_ABSENT) {
+    if (result == LETTER_EMPTY) {
 
         gfx_color(
             COLOR_BORDER_R,
@@ -275,7 +275,7 @@ void ui_draw_game(const Game *game)
                 draw_tile(
                     x,
                     y,
-                    LETTER_ABSENT
+                    LETTER_EMPTY
                 );
 
                 continue;
@@ -284,8 +284,8 @@ void ui_draw_game(const Game *game)
             /*
              * Draw the submitted guess.
              */
-            GuessResult *guess =
-                (GuessResult *)&game->guesses[row];
+            const GuessResult *guess =
+                &game->guesses[row];
 
             draw_tile(
                 x,
@@ -393,7 +393,7 @@ void ui_draw_current_guess(
         draw_tile(
             x,
             y,
-            LETTER_ABSENT
+            LETTER_EMPTY
         );
     }
 

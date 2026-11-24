@@ -50,7 +50,7 @@ int main(void)
         );
 
         int success =
-            game_submit_guess(&game, guesses[i]);
+            game_submit_guess(&game, guesses[i]) == GUESS_ACCEPTED;
 
         printf(
             "Submitted: %s\n",
@@ -72,7 +72,7 @@ int main(void)
     printf("=== Seventh Guess Test ===\n\n");
 
     int success =
-        game_submit_guess(&game, "CRANE");
+        game_submit_guess(&game, "CRANE") == GUESS_ACCEPTED;
 
     printf(
         "Seventh guess accepted: %s\n",

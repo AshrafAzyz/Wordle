@@ -23,7 +23,7 @@ int main(void)
     );
 
     if (words == NULL || word_count == 0) {
-        printf("Failed to load dictionary.\n");
+        fprintf(stderr, "Failed to load dictionary: data/words.txt\n");
         return 1;
     }
 
@@ -42,7 +42,7 @@ int main(void)
         );
 
     if (answer == NULL) {
-        printf("Failed to select a word.\n");
+        fprintf(stderr, "Failed to select a word.\n");
 
         dictionary_free(
             words,
@@ -57,10 +57,11 @@ int main(void)
      */
     Game game;
 
-    game_init(
-        &game,
-        answer
-    );
+    if (!game_init(&game, answer)) {
+        fprintf(stderr, "Invalid answer word: %s\n", answer);
+        dictionary_free(words, word_count);
+        return 1;
+    }
 
     /*
      * Initialize systems.
@@ -199,10 +200,10 @@ int main(void)
             /*
              * Submit guess.
              */
-            if (!game_submit_guess(
+            if (game_submit_guess(
                     &game,
                     current_guess
-                )) {
+                ) != GUESS_ACCEPTED) {
 
                 continue;
             }
@@ -241,7 +242,7 @@ int main(void)
     else {
 
         ui_display_game_over(
-            answer
+            game.answer
         );
     }
 

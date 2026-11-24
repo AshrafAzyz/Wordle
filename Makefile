@@ -64,7 +64,7 @@ run: $(TARGET)
 
 # ---- tests ----------------------------------------------------------
 
-$(BUILD_DIR)/test_game: $(BUILD_DIR)/test_game.o $(BUILD_DIR)/game.o
+$(BUILD_DIR)/test_game: $(BUILD_DIR)/test_game.o $(BUILD_DIR)/game.o $(BUILD_DIR)/dictionary.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 $(BUILD_DIR)/test_dictionary: $(BUILD_DIR)/test_dictionary.o $(BUILD_DIR)/dictionary.o
