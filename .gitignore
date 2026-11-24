@@ -4,3 +4,6 @@ build/
 # Stray objects/binaries if something is compiled by hand
 *.o
 *.out
+
+# Local knowledge graph built by graphify (not part of the project)
+graphify-out/
