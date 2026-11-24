@@ -3,6 +3,7 @@
 #   make               build the game          -> build/wordle
 #   make run           build and start the game
 #   make test          build and run automated tests (no display needed)
+#   make memcheck      run the automated tests under Valgrind
 #   make manual-tests  build interactive X11 tests (test_gfx, test_input)
 #   make debug         build with AddressSanitizer/UBSan -> build/debug/
 #   make clean         delete everything under build/
@@ -38,7 +39,7 @@ APP_OBJ  := $(APP_SRC:src/%.c=$(BUILD_DIR)/%.o)
 TESTS        := $(BUILD_DIR)/test_game $(BUILD_DIR)/test_dictionary
 MANUAL_TESTS := $(BUILD_DIR)/test_gfx $(BUILD_DIR)/test_input
 
-.PHONY: all run test manual-tests debug clean
+.PHONY: all run test memcheck manual-tests debug clean
 
 all: $(TARGET)
 
@@ -84,6 +85,22 @@ test: $(TESTS)
 		./$$t || { echo "FAILED: $$t"; exit 1; }; \
 	done
 	@echo "All tests passed."
+
+# Run every test under Valgrind. Fails on any invalid read/write,
+# use of uninitialised memory, or leaked allocation.
+#   --leak-check=full            report each leak with a stack trace
+#   --show-leak-kinds=all        include "still reachable" memory
+#   --errors-for-leak-kinds=all  ...and count those as errors too
+#   --error-exitcode=1           exit non-zero if anything was found
+VALGRIND := valgrind -q --leak-check=full --show-leak-kinds=all \
+            --errors-for-leak-kinds=all --error-exitcode=1
+
+memcheck: $(TESTS)
+	@for t in $(TESTS); do \
+		echo "== valgrind $$t"; \
+		$(VALGRIND) ./$$t > /dev/null || { echo "MEMCHECK FAILED: $$t"; exit 1; }; \
+	done
+	@echo "No memory errors or leaks."
 
 manual-tests: $(MANUAL_TESTS)
 

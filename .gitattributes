@@ -1,0 +1,4 @@
+# Test fixtures must stay byte-for-byte identical on every OS.
+# -text stops Git from converting line endings (e.g. CRLF <-> LF on
+# Windows checkouts), which would silently change what the tests check.
+tests/data/* -text
