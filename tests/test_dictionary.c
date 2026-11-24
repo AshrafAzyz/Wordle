@@ -21,7 +21,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#define REAL_DICTIONARY "data/words.txt"
+#define REAL_DICTIONARY "data/words.txt"     /* allowed guesses */
+#define REAL_ANSWERS    "data/answers.txt"   /* possible answers */
 #define FIXTURE(name)   ("tests/data/" name)
 
 
@@ -58,32 +59,77 @@ static void test_normalize_rejects_bad_words(void)
 
 /* ---- loading the real word list ------------------------------------ */
 
+/* Every word valid, uppercase, unique and in sorted order. */
+static int list_is_clean(char **words, int count)
+{
+    for (int i = 0; i < count; i++) {
+        char out[WORD_LENGTH + 1];
+
+        if (!dictionary_normalize_word(words[i], out) ||
+            strcmp(out, words[i]) != 0) {
+            return 0;
+        }
+        if (i > 0 && strcmp(words[i - 1], words[i]) >= 0) {
+            return 0;   /* duplicate or out of order */
+        }
+    }
+
+    return 1;
+}
+
 static void test_load_real_dictionary(void)
 {
     int count = 0;
     char **words = dictionary_load(REAL_DICTIONARY, &count);
 
     CHECK(words != NULL);
-    /* 200 words also exercises growing the array past its first 128. */
-    CHECK(count == 200);
+    /* The original 200 words plus 5,000 from SCOWL. */
+    CHECK(count == 5200);
 
     if (words != NULL && count > 0) {
-        CHECK_STR_EQ(words[0], "ADMIT");
-        CHECK_STR_EQ(words[count - 1], "ZESTY");
+        CHECK_STR_EQ(words[0], "AALII");
+        CHECK_STR_EQ(words[count - 1], "ZORCH");
+        CHECK(list_is_clean(words, count));
 
-        /* Every stored word must already be valid and uppercase. */
-        int all_valid = 1;
-        for (int i = 0; i < count; i++) {
-            char out[WORD_LENGTH + 1];
-            if (!dictionary_normalize_word(words[i], out) ||
-                strcmp(out, words[i]) != 0) {
-                all_valid = 0;
-            }
-        }
-        CHECK(all_valid);
+        /* The original 200 words are all still accepted. */
+        CHECK(dictionary_contains(words, count, "ADMIT"));
+        CHECK(dictionary_contains(words, count, "ZESTY"));
     }
 
     dictionary_free(words, count);
+}
+
+static void test_real_answers_are_allowed_guesses(void)
+{
+    int word_count = 0;
+    int answer_count = 0;
+    char **words = dictionary_load(REAL_DICTIONARY, &word_count);
+    char **answers = dictionary_load(REAL_ANSWERS, &answer_count);
+
+    CHECK(answers != NULL);
+    CHECK(answer_count == 2176);
+
+    if (words != NULL && answers != NULL) {
+        CHECK(list_is_clean(answers, answer_count));
+
+        /*
+         * If an answer could not be typed as a guess, that game would
+         * be impossible to win, so every answer must be in words.txt.
+         */
+        int missing = 0;
+        for (int i = 0; i < answer_count; i++) {
+            if (!dictionary_contains(words, word_count, answers[i])) {
+                if (missing < 5) {
+                    printf("    answer %s is not an allowed guess\n", answers[i]);
+                }
+                missing++;
+            }
+        }
+        CHECK(missing == 0);
+    }
+
+    dictionary_free(words, word_count);
+    dictionary_free(answers, answer_count);
 }
 
 static void test_contains_is_case_insensitive(void)
@@ -308,6 +354,7 @@ int main(void)
     RUN_TEST(test_normalize_accepts_five_letters);
     RUN_TEST(test_normalize_rejects_bad_words);
     RUN_TEST(test_load_real_dictionary);
+    RUN_TEST(test_real_answers_are_allowed_guesses);
     RUN_TEST(test_contains_is_case_insensitive);
     RUN_TEST(test_contains_rejects_unknown_words);
     RUN_TEST(test_load_skips_invalid_lines);

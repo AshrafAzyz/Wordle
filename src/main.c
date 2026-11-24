@@ -28,12 +28,16 @@
 #include <time.h>
 #include <unistd.h>
 
-#define DICTIONARY_FILE "words.txt"
+/* Allowed guesses, and the (smaller) list secret words come from. */
+#define WORDS_FILE   "words.txt"
+#define ANSWERS_FILE "answers.txt"
 #define PATH_SIZE 4096
 
 typedef struct {
-    char **words;
+    char **words;          /* every word accepted as a guess */
     int word_count;
+    char **answers;        /* words that can be the secret word */
+    int answer_count;
 
     Screen screen;
     int running;
@@ -63,9 +67,9 @@ static void set_message(App *app, const char *message, int is_error)
 
 static void start_new_game(App *app)
 {
-    const char *answer = dictionary_pick_random(app->words, app->word_count);
+    const char *answer = dictionary_pick_random(app->answers, app->answer_count);
 
-    /* Every dictionary word is valid, so this cannot fail. */
+    /* Every loaded word is valid, so this cannot fail. */
     game_init(&app->game, answer);
 
     clear_typed(app);
@@ -348,17 +352,17 @@ static int executable_dir(char *dir, size_t size)
 }
 
 /*
- * Find and load the word list, so the game works no matter which
+ * Find and load a word list file, so the game works no matter which
  * folder it is started from. Tried in order:
- *   <program dir>/../data/words.txt          development build (build/wordle)
- *   <program dir>/../share/wordle/words.txt  after `make install`
- *   data/words.txt                           relative to the current folder
+ *   <program dir>/../data/<file>          development build (build/wordle)
+ *   <program dir>/../share/wordle/<file>  after `make install`
+ *   data/<file>                           relative to the current folder
  */
-static char **load_word_list(int *count)
+static char **load_word_list(const char *file, int *count)
 {
     static const char *const FROM_PROGRAM[] = {
-        "../data/" DICTIONARY_FILE,          /* adjacent literals are joined */
-        "../share/wordle/" DICTIONARY_FILE,
+        "../data",
+        "../share/wordle",
     };
 
     char dir[PATH_SIZE];
@@ -366,7 +370,8 @@ static char **load_word_list(int *count)
     if (executable_dir(dir, sizeof(dir))) {
         for (size_t i = 0; i < sizeof(FROM_PROGRAM) / sizeof(FROM_PROGRAM[0]); i++) {
             char path[PATH_SIZE + 64];
-            int needed = snprintf(path, sizeof(path), "%s/%s", dir, FROM_PROGRAM[i]);
+            int needed = snprintf(path, sizeof(path), "%s/%s/%s",
+                                  dir, FROM_PROGRAM[i], file);
 
             /* snprintf returns the length it wanted; skip if it was cut short. */
             if (needed < 0 || (size_t)needed >= sizeof(path)) {
@@ -380,7 +385,17 @@ static char **load_word_list(int *count)
         }
     }
 
-    return dictionary_load("data/" DICTIONARY_FILE, count);
+    char path[PATH_SIZE];
+    snprintf(path, sizeof(path), "data/%s", file);
+
+    return dictionary_load(path, count);
+}
+
+/* Free both word lists (safe if either is NULL). */
+static void free_word_lists(App *app)
+{
+    dictionary_free(app->words, app->word_count);
+    dictionary_free(app->answers, app->answer_count);
 }
 
 
@@ -388,13 +403,15 @@ int main(void)
 {
     static App app;   /* static: zero-initialised, and off the stack */
 
-    app.words = load_word_list(&app.word_count);
+    app.words = load_word_list(WORDS_FILE, &app.word_count);
+    app.answers = load_word_list(ANSWERS_FILE, &app.answer_count);
 
-    if (app.words == NULL) {
+    if (app.words == NULL || app.answers == NULL) {
         fprintf(stderr,
-                "Failed to load the word list (" DICTIONARY_FILE ").\n"
+                "Failed to load the word lists (" WORDS_FILE ", " ANSWERS_FILE ").\n"
                 "Run the game from the project folder, or install it with "
                 "`make install`.\n");
+        free_word_lists(&app);
         return 1;
     }
 
@@ -408,7 +425,7 @@ int main(void)
 
     if (!ui_init()) {
         /* gfx_open() already explained why; clean up before leaving. */
-        dictionary_free(app.words, app.word_count);
+        free_word_lists(&app);
         return 1;
     }
 
@@ -447,7 +464,7 @@ int main(void)
 
     audio_shutdown();
     ui_shutdown();
-    dictionary_free(app.words, app.word_count);
+    free_word_lists(&app);
 
     return 0;
 }

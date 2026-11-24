@@ -160,6 +160,8 @@ debug:
 install: $(TARGET)
 	install -Dm755 $(TARGET) $(BINDIR)/wordle
 	install -Dm644 data/words.txt $(DATADIR)/words.txt
+	install -Dm644 data/answers.txt $(DATADIR)/answers.txt
+	install -Dm644 data/LICENSE-words.txt $(DATADIR)/LICENSE-words.txt
 	install -Dm644 assets/wordle.svg $(ICONDIR)/wordle.svg
 	mkdir -p $(APPDIR)
 	sed 's|@BINDIR@|$(BINDIR)|' assets/wordle.desktop.in > $(APPDIR)/wordle.desktop
@@ -169,7 +171,8 @@ install: $(TARGET)
 # Remove only the files we installed; rmdir fails harmlessly if the
 # folder is not empty, so nothing else is ever deleted.
 uninstall:
-	rm -f $(BINDIR)/wordle $(DATADIR)/words.txt \
+	rm -f $(BINDIR)/wordle $(DATADIR)/words.txt $(DATADIR)/answers.txt \
+	      $(DATADIR)/LICENSE-words.txt \
 	      $(ICONDIR)/wordle.svg $(APPDIR)/wordle.desktop
 	-rmdir $(DATADIR) 2>/dev/null
 

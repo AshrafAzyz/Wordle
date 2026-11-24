@@ -28,8 +28,9 @@
 
 #define MAX_VOICES     16      /* effects that can overlap            */
 #define BLOCK_FRAMES   256     /* samples mixed per loop (~12 ms)     */
-#define LATENCY_US     60000   /* ALSA buffer: 60 ms                  */
+#define LATENCY_US     100000  /* ALSA buffer: 100 ms (slack for VMs) */
 #define FADE_SAMPLES   (SOUND_SAMPLE_RATE / 4)   /* music fade: 0.25 s */
+#define WARMUP_SAMPLES SOUND_SAMPLE_RATE         /* 1 s before music  */
 
 typedef struct {
     const short *data;     /* NULL = free slot                 */
@@ -48,6 +49,7 @@ static struct {
     int running;
     int muted;
     int music_wanted;
+    int warmup;            /* samples of silence left before music */
     int music_level;       /* 0..FADE_SAMPLES: current music volume */
     int music_position;
     Voice voices[MAX_VOICES];
@@ -92,7 +94,15 @@ static void mix_block(short *out, int frames)
 
     /* Music, faded in/out smoothly instead of starting abruptly. */
     for (int i = 0; i < frames; i++) {
-        if (audio.music_wanted && audio.music_level < FADE_SAMPLES) {
+        /*
+         * Hold the music back for the first second: the sound card is
+         * often waking from power-saving and may stutter briefly, and
+         * gaps in silence cannot be heard. Effects are not delayed.
+         */
+        if (audio.warmup > 0) {
+            audio.warmup--;
+        }
+        else if (audio.music_wanted && audio.music_level < FADE_SAMPLES) {
             audio.music_level++;
         }
         else if (!audio.music_wanted && audio.music_level > 0) {
@@ -213,6 +223,7 @@ int audio_init(void)
 
     pthread_mutex_init(&audio.lock, NULL);
     audio.running = 1;
+    audio.warmup = WARMUP_SAMPLES;
 
     if (pthread_create(&audio.thread, NULL, audio_thread, NULL) != 0) {
         fprintf(stderr, "Sound disabled: could not start audio thread\n");

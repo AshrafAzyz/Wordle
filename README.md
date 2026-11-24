@@ -29,6 +29,9 @@ history of that work is in the Git log, one commit per milestone.
   correctly (e.g. guessing `EERIE` against `CRANE` colours only one E).
 - Play with the physical keyboard **or** by clicking the on-screen
   keyboard; keys change colour as you learn about each letter.
+- **5,200 allowed guesses** and **2,176 possible answers**: answers are
+  everyday words (no plurals or past tenses), while any of the 5,200
+  words can be used as a guess.
 - Clear feedback for guesses that are too short or not in the word list
   (they do not cost a turn).
 - Main menu, How to Play, result screen with Play Again, and a goodbye
@@ -69,7 +72,7 @@ make          # builds build/wordle
 make run      # builds (if needed) and starts the game
 ```
 
-The game finds its word list relative to the program itself, so
+The game finds its word lists relative to the program itself, so
 `./build/wordle` works from any folder. If no audio device can be
 opened, it prints `Sound disabled: ...` and plays silently.
 
@@ -80,7 +83,8 @@ make install      # for the current user, no sudo needed
 make uninstall    # removes exactly what install added
 ```
 
-This copies the game to `~/.local/bin/wordle`, the word list to
+This copies the game to `~/.local/bin/wordle`, the word lists (and
+their licence) to
 `~/.local/share/wordle/`, and adds a launcher with the Wordle icon to the
 application menu. Use `make install PREFIX=/some/path` to install
 elsewhere. If `~/.local/bin` is not on your `PATH`, start it from the
@@ -117,7 +121,10 @@ wordle/
 │   └── gfx.c          thin X11 layer: window, double-buffered drawing, events
 ├── include/           one header per module (its public interface)
 ├── tests/             unit tests, test data and manual X11 tests
-├── data/words.txt     word list (answers and allowed guesses)
+├── data/
+│   ├── words.txt          5,200 allowed guesses
+│   ├── answers.txt        2,176 possible answers (all also in words.txt)
+│   └── LICENSE-words.txt  licence for the word lists (SCOWL)
 ├── assets/            icon and application-menu entry
 ├── docs/              audit notes and screenshots
 └── Makefile
@@ -141,10 +148,29 @@ mixes the music and up to 16 overlapping effects on its own thread;
 the shared data is protected by a mutex. `ui` only draws and reports what was clicked;
 `main` is the only module that changes game state.
 
+## Word lists
+
+- `data/words.txt` - every word accepted as a guess (5,200).
+- `data/answers.txt` - the secret word is picked from here (2,176).
+
+Both files hold one word per line. Lines that are not exactly five
+letters A-Z are ignored, and lowercase is converted, so you can add
+words with any text editor. Every answer must also be in `words.txt`;
+`make test` checks this.
+
+The lists combine the original 200 words with 5,000 words from
+**SCOWL** (Spell Checker Oriented Word Lists) by Kevin Atkinson, as
+packaged by Ubuntu (`wamerican`, `wamerican-small`, `wamerican-large`):
+all common five-letter words (SCOWL sizes 35 and 50) plus an even
+selection from size 70. Proper names, offensive words and slurs were
+removed. Answers come from the most common tier (size 35), leaving out
+likely plurals (`-S`, except words such as `BONUS` or `CHAOS`) and past
+tenses (`-ED`, except words such as `GREED`).
+
 ## Testing
 
 ```sh
-make test            # 39 unit tests, no display or speakers needed
+make test            # 40 unit tests, no display or speakers needed
 make memcheck        # the same tests under Valgrind (fails on any leak/error)
 make debug           # build with AddressSanitizer + UndefinedBehaviorSanitizer
 make memcheck-game   # play the real game under Valgrind (audio muted, see below)
@@ -160,6 +186,8 @@ win and loss, keyboard colours, and dictionary loading failures
   implementation on all 59,049 answer/guess pairs over three letters;
 - **1,000 random games** checking rules that must always hold;
 - a **100,000-word** generated dictionary;
+- the real word lists: valid, sorted, no duplicates, and **every answer
+  is also an allowed guess** (otherwise a game could be unwinnable);
 - sound tests: every effect renders, is audible but not clipped, fades
   in and out (no clicks), and the tile notes have the right pitch
   (measured by counting zero crossings); the music loops seamlessly.
@@ -178,9 +206,9 @@ and builds without warnings.
 - **Linux only.** Graphics use Xlib directly. A Windows `.exe` would
   need a Windows version of `src/gfx.c` (Win32 or a library such as
   SDL); the game logic, dictionary and tests would not change.
-- **Small word list.** `data/words.txt` has 200 words, used both for
-  answers and allowed guesses, so many real English words are rejected.
-  Add more words (one per line) to extend it.
+- **Word lists are generated, not hand-checked.** The 2,176 answers and
+  5,200 guesses come from SCOWL with automatic filters, so a few answers
+  may be unusual words, and some rare words are still missing.
 - **Random, not daily.** Each game picks a random word; there is no
   daily puzzle, statistics or streaks.
 - No animations or hard mode. Sound has an on/off switch but no volume
@@ -191,6 +219,11 @@ and builds without warnings.
 - English letters A–Z only. The on-screen keyboard is alphabetical
   (as in the original design), not QWERTY.
 - On very small windows (minimum 320×360) the text becomes tiny.
+- **Sound in virtual machines.** The menu music waits about one second
+  after start-up, so the sound card can wake from power saving in
+  silence. If sound still crackles in VirtualBox, set the VM's
+  *Settings → Audio → Audio Controller* to **Intel HD Audio** (the older
+  ICH AC97 controller is prone to stutter).
 - Fullscreen depends on the window manager supporting the standard
   `_NET_WM_STATE_FULLSCREEN` request.
 
@@ -206,5 +239,15 @@ and builds without warnings.
   effect are written as tables in that file). No recorded audio,
   sample packs or third-party sound files are used, so no extra
   licence applies; they are covered by the MIT License below.
+- **Word lists** (`data/words.txt`, `data/answers.txt`) are derived
+  from **SCOWL**, Copyright 2000-2011 by Kevin Atkinson, which also
+  includes material from Alan Beale's 12Dicts, WordNet 1.6 (Copyright
+  1997 by Princeton University), the UK Advanced Cryptics Dictionary
+  (Copyright J Ross Beresford 1993-1999) and Ispell (Copyright 1993
+  Geoff Kuenning). Its permission notice and all required copyright
+  notices are included verbatim in
+  [`data/LICENSE-words.txt`](data/LICENSE-words.txt) and installed with
+  the word lists. The lists are distributed under those terms, not
+  under the MIT License.
 - Everything else: © 2026 Ahmad Ashraf, released under the
   [MIT License](LICENSE).
