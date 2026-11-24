@@ -1,14 +1,6 @@
-# Compiled test executables
-tests/test_game
-tests/test_dictionary
-tests/test_input
-
-# General C build output
-*.o
-*.out
-
-# Build directory
+# All build output goes here (created by make, removed by make clean)
 build/
 
-/wordle
-tests/test_gfx
+# Stray objects/binaries if something is compiled by hand
+*.o
+*.out

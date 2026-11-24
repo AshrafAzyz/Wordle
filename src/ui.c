@@ -573,9 +573,58 @@ static void draw_goodbye(void)
 
 /* ---- public API ---------------------------------------------------- */
 
+/*
+ * Window icon: a green "correct" tile with a black border and a
+ * white W from the pixel font, on an 18 x 18 grid. The same design
+ * is stored as assets/wordle.svg for the application menu.
+ */
+#define ICON_CELLS 18
+#define ICON_SCALE 4
+#define ICON_SIZE  (ICON_CELLS * ICON_SCALE)
+
+static unsigned int to_argb(Color c)
+{
+    return 0xFF000000u |               /* fully opaque */
+           ((unsigned int)c.r << 16) |
+           ((unsigned int)c.g << 8) |
+           (unsigned int)c.b;
+}
+
+static void set_window_icon(void)
+{
+    static unsigned int pixels[ICON_SIZE * ICON_SIZE];
+
+    for (int y = 0; y < ICON_SIZE; y++) {
+        for (int x = 0; x < ICON_SIZE; x++) {
+            int cx = x / ICON_SCALE;
+            int cy = y / ICON_SCALE;
+            Color c = COLOR_CORRECT;
+
+            if (cx == 0 || cy == 0 || cx == ICON_CELLS - 1 || cy == ICON_CELLS - 1) {
+                c = COLOR_BLACK;
+            }
+            /* W is 10 x 14 cells (glyph x2), centred: cells 4..13, 2..15. */
+            else if (cx >= 4 && cy >= 2 &&
+                     font_glyph_pixel('W', (cx - 4) / 2, (cy - 2) / 2)) {
+                c = COLOR_WHITE;
+            }
+
+            pixels[y * ICON_SIZE + x] = to_argb(c);
+        }
+    }
+
+    gfx_set_icon(ICON_SIZE, ICON_SIZE, pixels);
+}
+
 int ui_init(void)
 {
-    return gfx_open(WINDOW_WIDTH, WINDOW_HEIGHT, "Wordle");
+    if (!gfx_open(WINDOW_WIDTH, WINDOW_HEIGHT, "Wordle")) {
+        return 0;
+    }
+
+    set_window_icon();
+
+    return 1;
 }
 
 void ui_shutdown(void)

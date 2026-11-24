@@ -7,6 +7,8 @@
 #   make memcheck-game play the game under Valgrind (strict, interactive)
 #   make manual-tests  build interactive X11 tests (test_gfx, test_input)
 #   make debug         build with AddressSanitizer/UBSan -> build/debug/
+#   make install       install for the current user (~/.local, no sudo)
+#   make uninstall     remove what `make install` added
 #   make clean         delete everything under build/
 
 CC := gcc
@@ -40,7 +42,15 @@ APP_OBJ  := $(APP_SRC:src/%.c=$(BUILD_DIR)/%.o)
 TESTS        := $(BUILD_DIR)/test_game $(BUILD_DIR)/test_dictionary
 MANUAL_TESTS := $(BUILD_DIR)/test_gfx $(BUILD_DIR)/test_input
 
-.PHONY: all run test memcheck memcheck-game manual-tests debug clean
+# Installation layout (XDG standard). `?=` sets PREFIX only if it was
+# not given, so `make install PREFIX=/some/where` also works.
+PREFIX  ?= $(HOME)/.local
+BINDIR  := $(PREFIX)/bin
+DATADIR := $(PREFIX)/share/wordle
+APPDIR  := $(PREFIX)/share/applications
+ICONDIR := $(PREFIX)/share/icons/hicolor/scalable/apps
+
+.PHONY: all run test memcheck memcheck-game manual-tests debug install uninstall clean
 
 all: $(TARGET)
 
@@ -121,6 +131,26 @@ debug:
 		OPT="-O0 -g3 -fno-omit-frame-pointer -fsanitize=address,undefined" \
 		LDFLAGS="-fsanitize=address,undefined" \
 		all $(TESTS:$(BUILD_DIR)/%=$(BUILD_DIR)/debug/%)
+
+# ---- installation ---------------------------------------------------
+
+# install -D creates missing parent folders; -m sets permissions
+# (755 = executable by everyone, 644 = readable data file).
+install: $(TARGET)
+	install -Dm755 $(TARGET) $(BINDIR)/wordle
+	install -Dm644 data/words.txt $(DATADIR)/words.txt
+	install -Dm644 assets/wordle.svg $(ICONDIR)/wordle.svg
+	mkdir -p $(APPDIR)
+	sed 's|@BINDIR@|$(BINDIR)|' assets/wordle.desktop.in > $(APPDIR)/wordle.desktop
+	chmod 644 $(APPDIR)/wordle.desktop
+	@echo "Installed. Start it from the application menu, or run: $(BINDIR)/wordle"
+
+# Remove only the files we installed; rmdir fails harmlessly if the
+# folder is not empty, so nothing else is ever deleted.
+uninstall:
+	rm -f $(BINDIR)/wordle $(DATADIR)/words.txt \
+	      $(ICONDIR)/wordle.svg $(APPDIR)/wordle.desktop
+	-rmdir $(DATADIR) 2>/dev/null
 
 clean:
 	rm -rf $(BUILD_DIR)

@@ -20,6 +20,7 @@
 #include "gfx.h"
 
 #include <X11/Xlib.h>
+#include <X11/Xatom.h>
 #include <X11/Xutil.h>
 
 #include <stdio.h>
@@ -221,6 +222,39 @@ void gfx_close(void)
     XCloseDisplay(display);
 
     display = NULL;
+}
+
+void gfx_set_icon(int width, int height, const unsigned int *argb)
+{
+    if (display == NULL || argb == NULL || width <= 0 || height <= 0) {
+        return;
+    }
+
+    /*
+     * _NET_WM_ICON is a list of CARDINALs: width, height, then the
+     * pixels. Xlib passes "format 32" data as C `long`s (64 bits on
+     * x86-64), so the pixels must be copied into a long array.
+     */
+    size_t count = 2 + (size_t)width * (size_t)height;
+    unsigned long *data = malloc(count * sizeof(*data));
+
+    if (data == NULL) {
+        return;   /* an icon is optional: carry on without one */
+    }
+
+    data[0] = (unsigned long)width;
+    data[1] = (unsigned long)height;
+
+    for (size_t i = 2; i < count; i++) {
+        data[i] = argb[i - 2];
+    }
+
+    XChangeProperty(display, window,
+                    XInternAtom(display, "_NET_WM_ICON", False),
+                    XA_CARDINAL, 32, PropModeReplace,
+                    (const unsigned char *)data, (int)count);
+
+    free(data);
 }
 
 void gfx_toggle_fullscreen(void)

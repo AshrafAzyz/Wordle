@@ -27,6 +27,12 @@ int gfx_open(int width, int height, const char *title);
 /* Release every X11 resource and close the window. */
 void gfx_close(void);
 
+/*
+ * Set the window icon shown in the taskbar / Alt-Tab.
+ * `argb` holds width * height pixels, row by row, as 0xAARRGGBB.
+ */
+void gfx_set_icon(int width, int height, const unsigned int *argb);
+
 /* Ask the window manager to toggle fullscreen (returns at once). */
 void gfx_toggle_fullscreen(void);
 

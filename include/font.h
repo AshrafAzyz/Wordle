@@ -22,4 +22,10 @@ int font_text_width(const char *text, int pixel);
 /* Height in screen pixels of one line at the given pixel size. */
 int font_text_height(int pixel);
 
+/*
+ * 1 if square (col, row) of character `ch` is filled, else 0.
+ * Lets other code (e.g. the window icon) reuse the glyph shapes.
+ */
+int font_glyph_pixel(char ch, int col, int row);
+
 #endif

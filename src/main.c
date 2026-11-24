@@ -11,6 +11,10 @@
  *
  * Closing the window quits from any screen.
  */
+
+/* For readlink() (POSIX). Must come before any #include. */
+#define _POSIX_C_SOURCE 200809L
+
 #include "dictionary.h"
 #include "game.h"
 #include "input.h"
@@ -19,9 +23,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
 
-#define DICTIONARY_PATH "data/words.txt"
+#define DICTIONARY_FILE "words.txt"
+#define PATH_SIZE 4096
 
 typedef struct {
     char **words;
@@ -248,14 +255,79 @@ static void draw(const App *app)
 }
 
 
+/* ---- locating the word list ---------------------------------------- */
+
+/*
+ * Write the folder containing the running program into `dir`.
+ * On Linux, /proc/self/exe is a symbolic link to the executable.
+ */
+static int executable_dir(char *dir, size_t size)
+{
+    ssize_t length = readlink("/proc/self/exe", dir, size - 1);
+
+    if (length <= 0) {
+        return 0;
+    }
+
+    dir[length] = '\0';   /* readlink() does not add the terminator */
+
+    char *last_slash = strrchr(dir, '/');
+    if (last_slash == NULL) {
+        return 0;
+    }
+
+    *last_slash = '\0';
+    return 1;
+}
+
+/*
+ * Find and load the word list, so the game works no matter which
+ * folder it is started from. Tried in order:
+ *   <program dir>/../data/words.txt          development build (build/wordle)
+ *   <program dir>/../share/wordle/words.txt  after `make install`
+ *   data/words.txt                           relative to the current folder
+ */
+static char **load_word_list(int *count)
+{
+    static const char *const FROM_PROGRAM[] = {
+        "../data/" DICTIONARY_FILE,          /* adjacent literals are joined */
+        "../share/wordle/" DICTIONARY_FILE,
+    };
+
+    char dir[PATH_SIZE];
+
+    if (executable_dir(dir, sizeof(dir))) {
+        for (size_t i = 0; i < sizeof(FROM_PROGRAM) / sizeof(FROM_PROGRAM[0]); i++) {
+            char path[PATH_SIZE + 64];
+            int needed = snprintf(path, sizeof(path), "%s/%s", dir, FROM_PROGRAM[i]);
+
+            /* snprintf returns the length it wanted; skip if it was cut short. */
+            if (needed < 0 || (size_t)needed >= sizeof(path)) {
+                continue;
+            }
+
+            char **words = dictionary_load(path, count);
+            if (words != NULL) {
+                return words;
+            }
+        }
+    }
+
+    return dictionary_load("data/" DICTIONARY_FILE, count);
+}
+
+
 int main(void)
 {
     static App app;   /* static: zero-initialised, and off the stack */
 
-    app.words = dictionary_load(DICTIONARY_PATH, &app.word_count);
+    app.words = load_word_list(&app.word_count);
 
     if (app.words == NULL) {
-        fprintf(stderr, "Failed to load dictionary: %s\n", DICTIONARY_PATH);
+        fprintf(stderr,
+                "Failed to load the word list (" DICTIONARY_FILE ").\n"
+                "Run the game from the project folder, or install it with "
+                "`make install`.\n");
         return 1;
     }
 

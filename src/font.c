@@ -123,3 +123,17 @@ int font_text_height(int pixel)
 {
     return FONT_GLYPH_HEIGHT * pixel;
 }
+
+
+int font_glyph_pixel(char ch, int col, int row)
+{
+    const Glyph *glyph = find_glyph(ch);
+
+    if (glyph == NULL ||
+        col < 0 || col >= FONT_GLYPH_WIDTH ||
+        row < 0 || row >= FONT_GLYPH_HEIGHT) {
+        return 0;
+    }
+
+    return glyph->rows[row][col] == '#';
+}

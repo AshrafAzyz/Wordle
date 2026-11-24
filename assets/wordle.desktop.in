@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Wordle
+Comment=Pixel-art word guessing game
+Exec=@BINDIR@/wordle
+Icon=wordle
+Terminal=false
+Categories=Game;LogicGame;
+Keywords=word;puzzle;guess;
