@@ -1,23 +1,48 @@
-#include "../src/input.h"
+/*
+ * Manual input test (requires an X11 display).
+ *
+ * Opens a small window and prints every InputEvent produced by the
+ * input module. Click the window, then type letters, Backspace,
+ * Enter or F11. Press ESC to quit.
+ *
+ * Not part of `make test`, because it needs a human at the keyboard.
+ * Build with: make manual-tests
+ */
+#include "gfx.h"
+#include "input.h"
 
 #include <stdio.h>
 
-
 int main(void)
 {
-    char guess[INPUT_BUFFER_SIZE];
-
+    gfx_open(400, 200, "Input Test - press ESC to quit");
     input_init();
 
-    printf("=== Input Test ===\n");
+    printf("Type letters, Backspace, Enter or F11. ESC quits.\n");
 
-    if (input_get_guess(guess, sizeof(guess))) {
-        printf("You entered: %s\n", guess);
-    }
-    else {
-        printf("Failed to read input.\n");
-        return 1;
-    }
+    for (;;) {
+        InputEvent event = input_wait_event();
 
-    return 0;
+        switch (event.type) {
+        case INPUT_LETTER:
+            printf("LETTER     %c\n", event.letter);
+            break;
+        case INPUT_BACKSPACE:
+            printf("BACKSPACE\n");
+            break;
+        case INPUT_ENTER:
+            printf("ENTER\n");
+            break;
+        case INPUT_FULLSCREEN:
+            printf("FULLSCREEN\n");
+            break;
+        case INPUT_ESCAPE:
+            printf("ESCAPE - exiting\n");
+            return 0;
+        case INPUT_NONE:
+            break;
+        }
+
+        fflush(stdout);
+    }
 }
